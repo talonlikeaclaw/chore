@@ -3,3 +3,50 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+---
+
+# Project Handoff — Chore Manager
+
+## What this app is
+A self-hosted household chore tracker for two users. Chores belong to rooms, have a recurrence interval, and users mark them done. Completions are logged with who did it and when. Due dates are calculated from last completion + interval. Overdue chores are highlighted. Real-time updates via Socket.io so both users see changes without refresh.
+
+## Working style
+**Work one piece at a time.** The user commits and reviews between each step — do not batch multiple features together. Stop and wait for the go-ahead after each logical chunk.
+
+## Tech stack
+- **Next.js 16** (App Router) — always read `node_modules/next/dist/docs/` before writing Next.js code
+- **Socket.io** — via `pages/api/socketio.ts` (Pages Router API route), client singleton in `src/lib/socket.ts`
+- **Better Auth** — email/password auth, Drizzle adapter, route handler at `src/app/api/auth/[...all]/route.ts`
+- **Drizzle ORM + pg** — `src/db/index.ts` exports `db` singleton (globalThis pattern for dev HMR), schema at `src/db/schema.ts`
+- **Postgres** — runs in Docker Compose, credentials come from `.env`
+- **ShadCN + Tailwind v4**
+- **Vitest + Testing Library** — unit tests, setup in `src/test/setup.ts`
+
+## What's been completed
+1. **Project scaffolding** — Next.js init, all dependencies installed, ShadCN initialized
+2. **Docker setup** — `Dockerfile` (node:24-bullseye-slim, multistage, standalone output), `docker-compose.yml` (app + postgres, `env_file: .env`, DATABASE_URL interpolated from individual vars, Postgres not exposed externally), `.dockerignore`
+3. **Socket.io** — `src/pages/api/socketio.ts` initializes Socket.io server on `res.socket.server`, ping/pong wired up. Client singleton in `src/lib/socket.ts`
+4. **DB connection** — `src/db/index.ts` with globalThis singleton pattern. Falls back to constructing URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` if `DATABASE_URL` not set (needed for local dev since Docker Compose constructs it at runtime)
+5. **Better Auth** — `src/lib/auth.ts` with Drizzle adapter + email/password enabled. Auth schema generated via `npx @better-auth/cli generate` into `src/db/schema.ts` (user, session, account, verification tables)
+6. **Initial migration** — `drizzle/0000_white_mattie_franklin.sql` generated via `npx drizzle-kit generate`. `drizzle.config.ts` uses `@next/env` to load `.env` and falls back to constructing URL from individual vars
+
+## What's in progress
+Applying the initial migration — the Docker Compose stack needs to be running first (`docker compose up -d`), then `npx drizzle-kit migrate`.
+
+## What's next (in order)
+1. **App schema** — add `rooms`, `chores`, `completions` tables to `src/db/schema.ts`, generate + apply migration
+2. **Better Auth UI** — sign-in/sign-up pages using Better Auth UI components
+3. **Auth client** — `src/lib/auth-client.ts` with `createAuthClient()`
+4. **Seed script** — seed the two hardcoded users
+5. **Dashboard** — chores grouped by room, overdue highlighted, mark-done button
+6. **Socket.io events** — broadcast completion events so both clients update live
+7. **Chore management** — create/edit/delete chores and rooms
+8. **History screen** — log of completions with who/when
+9. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection)
+
+## Key conventions
+- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` — no `DATABASE_URL` (Docker Compose constructs it; local dev falls back to constructing from individual vars)
+- Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`
+- Never use `drizzle-kit push` — always generate versioned migration files
+- Socket.io path is `/api/socketio` with `addTrailingSlash: false`
