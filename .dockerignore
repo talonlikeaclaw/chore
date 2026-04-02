@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env*
+node_modules
+.next
+drizzle
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+src/test
+vitest.config.ts
+coverage
