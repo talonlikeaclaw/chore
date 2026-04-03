@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer, primaryKey } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -75,9 +75,41 @@ export const verification = pgTable(
 
 // --- App schema ---
 
+export const households = pgTable("household", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  inviteCode: text("invite_code").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const householdMembers = pgTable(
+  "household_member",
+  {
+    householdId: text("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["owner", "member"] }).notNull().default("member"),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.householdId, table.userId] }),
+    index("household_member_userId_idx").on(table.userId),
+  ]
+);
+
 export const rooms = pgTable("room", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -108,7 +140,27 @@ export const chores = pgTable(
   ],
 );
 
-export const roomRelations = relations(rooms, ({ many }) => ({
+export const householdRelations = relations(households, ({ many }) => ({
+  members: many(householdMembers),
+  rooms: many(rooms),
+}));
+
+export const householdMemberRelations = relations(householdMembers, ({ one }) => ({
+  household: one(households, {
+    fields: [householdMembers.householdId],
+    references: [households.id],
+  }),
+  user: one(user, {
+    fields: [householdMembers.userId],
+    references: [user.id],
+  }),
+}));
+
+export const roomRelations = relations(rooms, ({ one, many }) => ({
+  household: one(households, {
+    fields: [rooms.householdId],
+    references: [households.id],
+  }),
   chores: many(chores),
 }));
 
@@ -157,6 +209,7 @@ export const completionRelations = relations(completions, ({ one }) => ({
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  householdMemberships: many(householdMembers),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
