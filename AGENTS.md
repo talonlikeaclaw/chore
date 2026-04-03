@@ -30,23 +30,21 @@ A self-hosted household chore tracker for two users. Chores belong to rooms, hav
 4. **DB connection** — `src/db/index.ts` with globalThis singleton pattern. Falls back to constructing URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` if `DATABASE_URL` not set (needed for local dev since Docker Compose constructs it at runtime)
 5. **Better Auth** — `src/lib/auth.ts` with Drizzle adapter + email/password enabled. Auth schema generated via `npx @better-auth/cli generate` into `src/db/schema.ts` (user, session, account, verification tables)
 6. **Initial migration** — `drizzle/0000_white_mattie_franklin.sql` generated via `npx drizzle-kit generate`. `drizzle.config.ts` uses `@next/env` to load `.env` and falls back to constructing URL from individual vars
+7. **Auth UI** — `@daveyplate/better-auth-ui` installed. Auth client at `src/lib/auth-client.ts`, `AuthUIProvider` in `src/app/providers.tsx`, Sonner `<Toaster />` in layout, dynamic auth route at `src/app/auth/[path]/page.tsx` (covers `/auth/sign-in`, `/auth/sign-up`, etc.)
 
 ## What's in progress
-Applying the initial migration — the Docker Compose stack needs to be running first (`docker compose up -d`), then `npx drizzle-kit migrate`.
+Smoke testing the auth UI — needs Docker Compose running (`docker compose up -d`), initial migration applied (`npx drizzle-kit migrate`), then `npm run dev` and visit `http://localhost:3000/auth/sign-in`.
 
 ## What's next (in order)
 1. **App schema** — add `rooms`, `chores`, `completions` tables to `src/db/schema.ts`, generate + apply migration
-2. **Better Auth UI** — sign-in/sign-up pages using Better Auth UI components
-3. **Auth client** — `src/lib/auth-client.ts` with `createAuthClient()`
-4. **Seed script** — seed the two hardcoded users
-5. **Dashboard** — chores grouped by room, overdue highlighted, mark-done button
-6. **Socket.io events** — broadcast completion events so both clients update live
-7. **Chore management** — create/edit/delete chores and rooms
-8. **History screen** — log of completions with who/when
-9. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection)
+2. **Dashboard** — chores grouped by room, overdue highlighted, mark-done button
+3. **Socket.io events** — broadcast completion events so both clients update live
+4. **Chore management** — create/edit/delete chores and rooms
+5. **History screen** — log of completions with who/when
+6. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection)
 
 ## Key conventions
-- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` — no `DATABASE_URL` (Docker Compose constructs it; local dev falls back to constructing from individual vars)
+- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — no `DATABASE_URL` (Docker Compose constructs it; local dev falls back to constructing from individual vars)
 - Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`
 - Never use `drizzle-kit push` — always generate versioned migration files
 - Socket.io path is `/api/socketio` with `addTrailingSlash: false`
