@@ -112,6 +112,25 @@ export const roomRelations = relations(rooms, ({ many }) => ({
   chores: many(chores),
 }));
 
+export const completions = pgTable(
+  "completion",
+  {
+    id: text("id").primaryKey(),
+    choreId: text("chore_id")
+      .notNull()
+      .references(() => chores.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("completion_choreId_idx").on(table.choreId),
+    index("completion_userId_idx").on(table.userId),
+  ],
+);
+
 export const choreRelations = relations(chores, ({ one, many }) => ({
   room: one(rooms, {
     fields: [chores.roomId],
@@ -122,6 +141,17 @@ export const choreRelations = relations(chores, ({ one, many }) => ({
     references: [user.id],
   }),
   completions: many(completions),
+}));
+
+export const completionRelations = relations(completions, ({ one }) => ({
+  chore: one(chores, {
+    fields: [completions.choreId],
+    references: [chores.id],
+  }),
+  user: one(user, {
+    fields: [completions.userId],
+    references: [user.id],
+  }),
 }));
 
 export const userRelations = relations(user, ({ many }) => ({

@@ -1,6 +1,6 @@
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { chores, rooms } from "@/db/schema";
+import { chores, completions, rooms } from "@/db/schema";
 
 describe("rooms table", () => {
   it("has expected columns", () => {
@@ -23,5 +23,16 @@ describe("chores table", () => {
     expect(cols).toHaveProperty("active");
     expect(cols).toHaveProperty("createdAt");
     expect(cols).toHaveProperty("updatedAt");
+  });
+});
+
+describe("completions table", () => {
+  it("has expected columns", () => {
+    const cols = getTableColumns(completions);
+    expect(cols).toHaveProperty("id");
+    expect(cols).toHaveProperty("choreId");
+    expect(cols).toHaveProperty("userId");
+    expect(cols).toHaveProperty("completedAt");
+    expect(cols).toHaveProperty("createdAt");
   });
 });
