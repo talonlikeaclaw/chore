@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -85,8 +85,43 @@ export const rooms = pgTable("room", {
     .notNull(),
 });
 
+export const chores = pgTable(
+  "chore",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    roomId: text("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    intervalDays: integer("interval_days").notNull(),
+    assignedUserId: text("assigned_user_id").references(() => user.id),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("chore_roomId_idx").on(table.roomId),
+    index("chore_assignedUserId_idx").on(table.assignedUserId),
+  ],
+);
+
 export const roomRelations = relations(rooms, ({ many }) => ({
   chores: many(chores),
+}));
+
+export const choreRelations = relations(chores, ({ one, many }) => ({
+  room: one(rooms, {
+    fields: [chores.roomId],
+    references: [rooms.id],
+  }),
+  assignedUser: one(user, {
+    fields: [chores.assignedUserId],
+    references: [user.id],
+  }),
+  completions: many(completions),
 }));
 
 export const userRelations = relations(user, ({ many }) => ({
