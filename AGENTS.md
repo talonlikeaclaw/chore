@@ -14,6 +14,8 @@ A self-hosted household chore tracker for two users. Chores belong to rooms, hav
 ## Working style
 **Work one piece at a time.** The user commits and reviews between each step — do not batch multiple features together. Stop and wait for the go-ahead after each logical chunk.
 
+**The user commits manually.** Never run `git add` or `git commit` — present the work, then wait. The user commits directly to `main` (no branch/PR workflow for this project). May switch to a branch/PR workflow if GitHub Actions CI is added in the future — the user has GitLab CI experience but not GitHub Actions, and hasn't decided if it's worth the overhead for a personal project.
+
 ## Tech stack
 - **Next.js 16** (App Router) — always read `node_modules/next/dist/docs/` before writing Next.js code
 - **Socket.io** — via `pages/api/socketio.ts` (Pages Router API route), client singleton in `src/lib/socket.ts`
@@ -25,15 +27,15 @@ A self-hosted household chore tracker for two users. Chores belong to rooms, hav
 
 ## What's been completed
 1. **Project scaffolding** — Next.js init, all dependencies installed, ShadCN initialized
-2. **Docker setup** — `Dockerfile` (node:24-bullseye-slim, multistage, standalone output), `docker-compose.yml` (app + postgres, `env_file: .env`, DATABASE_URL interpolated from individual vars, Postgres not exposed externally), `.dockerignore`
+2. **Docker setup** — `Dockerfile` (node:24-bullseye-slim, multistage with `dev` and `runner` stages), `docker-compose.yml` (prod, `env_file: .env`, `POSTGRES_HOST=db`), `docker-compose.dev.yml` (dev with compose watch, syncs `src/` and `public/`, rebuilds on package.json changes), `.dockerignore`
 3. **Socket.io** — `src/pages/api/socketio.ts` initializes Socket.io server on `res.socket.server`, ping/pong wired up. Client singleton in `src/lib/socket.ts`
-4. **DB connection** — `src/db/index.ts` with globalThis singleton pattern. Falls back to constructing URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` if `DATABASE_URL` not set (needed for local dev since Docker Compose constructs it at runtime)
+4. **DB connection** — `src/db/index.ts` with globalThis singleton pattern. Constructs URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` with `encodeURIComponent` (safe for special chars in passwords). `POSTGRES_HOST` defaults to `localhost`; compose sets it to `db` so the container resolves correctly. Never construct `DATABASE_URL` via shell interpolation in compose — special chars in passwords will break URL parsing.
 5. **Better Auth** — `src/lib/auth.ts` with Drizzle adapter + email/password enabled. Auth schema generated via `npx @better-auth/cli generate` into `src/db/schema.ts` (user, session, account, verification tables)
 6. **Initial migration** — `drizzle/0000_white_mattie_franklin.sql` generated via `npx drizzle-kit generate`. `drizzle.config.ts` uses `@next/env` to load `.env` and falls back to constructing URL from individual vars
-7. **Auth UI** — `@daveyplate/better-auth-ui` installed. Auth client at `src/lib/auth-client.ts`, `AuthUIProvider` in `src/app/providers.tsx`, Sonner `<Toaster />` in layout, dynamic auth route at `src/app/auth/[path]/page.tsx` (covers `/auth/sign-in`, `/auth/sign-up`, etc.)
+7. **Auth UI** — `@daveyplate/better-auth-ui` installed. Auth client at `src/lib/auth-client.ts`, `AuthUIProvider` in `src/app/providers.tsx`, Sonner `<Toaster />` in layout, dynamic auth route at `src/app/auth/[path]/page.tsx` (covers `/auth/sign-in`, `/auth/sign-up`, etc.). Requires `@import "@daveyplate/better-auth-ui/css"` in `globals.css` for Tailwind v4 — without it component classes are not generated and styling breaks.
 
 ## What's in progress
-Smoke testing the auth UI — needs Docker Compose running (`docker compose up -d`), initial migration applied (`npx drizzle-kit migrate`), then `npm run dev` and visit `http://localhost:3000/auth/sign-in`.
+Auth UI smoke tested and working. Sign-up and sign-in confirmed functional.
 
 ## What's next (in order)
 1. **App schema** — add `rooms`, `chores`, `completions` tables to `src/db/schema.ts`, generate + apply migration
@@ -43,8 +45,15 @@ Smoke testing the auth UI — needs Docker Compose running (`docker compose up -
 5. **History screen** — log of completions with who/when
 6. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection)
 
+## Dev workflow
+- **Dev:** `docker compose -f docker-compose.dev.yml watch` — hot reload via compose watch, no rebuild needed for source changes
+- **Prod:** `docker compose up --build -d`
+- **Migrations:** `npx drizzle-kit migrate` (runs against localhost:5432, requires postgres container running with port 5432 exposed)
+- This is a personal project — commit directly to main, no branch/PR workflow needed
+
 ## Key conventions
-- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — no `DATABASE_URL` (Docker Compose constructs it; local dev falls back to constructing from individual vars)
+- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — no `DATABASE_URL`
+- Compose sets `POSTGRES_HOST=db`; local dev defaults to `localhost`. Never use shell-interpolated `DATABASE_URL` in compose files
 - Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`
 - Never use `drizzle-kit push` — always generate versioned migration files
 - Socket.io path is `/api/socketio` with `addTrailingSlash: false`
