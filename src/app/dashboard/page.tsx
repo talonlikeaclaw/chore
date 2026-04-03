@@ -4,14 +4,22 @@ import { desc, eq } from "drizzle-orm"
 
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
-import { chores, completions } from "@/db/schema"
+import { chores, completions, householdMembers, rooms } from "@/db/schema"
 import { DashboardView } from "./dashboard-view"
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect("/auth/sign-in")
 
-  const rooms = await db.query.rooms.findMany({
+  const membership = await db.query.householdMembers.findFirst({
+    where: eq(householdMembers.userId, session.user.id),
+    with: { household: true },
+  })
+
+  if (!membership) redirect("/auth/sign-in")
+
+  const roomList = await db.query.rooms.findMany({
+    where: eq(rooms.householdId, membership.householdId),
     with: {
       chores: {
         where: eq(chores.active, true),
@@ -30,5 +38,10 @@ export default async function DashboardPage() {
     },
   })
 
-  return <DashboardView rooms={rooms} />
+  return (
+    <DashboardView
+      rooms={roomList}
+      inviteCode={membership.household.inviteCode}
+    />
+  )
 }

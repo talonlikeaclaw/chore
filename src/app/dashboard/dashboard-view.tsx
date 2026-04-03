@@ -1,8 +1,10 @@
 "use client"
 
-import { useOptimistic, useTransition } from "react"
+import { useState, useOptimistic, useTransition } from "react"
 import { toast } from "sonner"
-import { markDone, undoCompletion } from "@/lib/actions"
+import { Check, Link2, Plus, X } from "lucide-react"
+import { createRoom, markDone, undoCompletion } from "@/lib/actions"
+import { Button } from "@/components/ui/button"
 import { RoomSection } from "./room-section"
 
 type Chore = {
@@ -24,14 +26,23 @@ type Room = {
 
 type DashboardViewProps = {
   rooms: Room[]
+  inviteCode: string
 }
 
-export function DashboardView({ rooms }: DashboardViewProps) {
+export function DashboardView({ rooms, inviteCode }: DashboardViewProps) {
+  const [addingRoom, setAddingRoom] = useState(false)
+  const [newRoomName, setNewRoomName] = useState("")
   const [, startTransition] = useTransition()
   const [optimisticDoneIds, addOptimisticDone] = useOptimistic(
     new Set<string>(),
     (state, choreId: string) => new Set([...state, choreId])
   )
+
+  const handleCopyInvite = () => {
+    const url = `${window.location.origin}/join/${inviteCode}`
+    navigator.clipboard.writeText(url)
+    toast("Invite link copied!")
+  }
 
   const handleMarkDone = (choreId: string) => {
     startTransition(async () => {
@@ -47,16 +58,33 @@ export function DashboardView({ rooms }: DashboardViewProps) {
     })
   }
 
-  if (rooms.length === 0) {
-    return (
-      <p className="text-center text-muted-foreground">
-        No rooms yet. Add a room to get started.
-      </p>
-    )
+  const handleAddRoom = () => {
+    if (!newRoomName.trim()) return
+    startTransition(async () => {
+      await createRoom(newRoomName.trim())
+      setNewRoomName("")
+      setAddingRoom(false)
+    })
+  }
+
+  const cancelAddRoom = () => {
+    setAddingRoom(false)
+    setNewRoomName("")
   }
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={handleCopyInvite}>
+          <Link2 className="h-4 w-4" />
+          Copy invite link
+        </Button>
+      </div>
+      {rooms.length === 0 && !addingRoom && (
+        <p className="text-center text-muted-foreground">
+          No rooms yet. Add a room to get started.
+        </p>
+      )}
       {rooms.map((room) => (
         <RoomSection
           key={room.id}
@@ -65,6 +93,37 @@ export function DashboardView({ rooms }: DashboardViewProps) {
           onMarkDone={handleMarkDone}
         />
       ))}
+      {addingRoom ? (
+        <div className="flex items-center gap-2">
+          <input
+            className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            placeholder="Room name"
+            value={newRoomName}
+            onChange={(e) => setNewRoomName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAddRoom()
+              if (e.key === "Escape") cancelAddRoom()
+            }}
+            autoFocus
+          />
+          <Button size="icon-sm" variant="ghost" onClick={handleAddRoom}>
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon-sm" variant="ghost" onClick={cancelAddRoom}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => setAddingRoom(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Add room
+        </Button>
+      )}
     </div>
   )
 }
