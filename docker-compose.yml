@@ -2,27 +2,76 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
-    env_file: .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  migrate:
+    build:
+      context: .
+      target: migrator
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+    secrets:
+      - postgres_password
+    command: sh -c 'export POSTGRES_PASSWORD=$$(cat /run/secrets/postgres_password) && npx drizzle-kit migrate'
+    restart: "no"
+
   app:
-    build: .
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL}
     restart: unless-stopped
     depends_on:
-      - db
-    env_file: .env
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL}
+    secrets:
+      - postgres_password
+      - better_auth_secret
     ports:
       - "3000:3000"
 
+  cloudflared:
+    image: cloudflare/cloudflared:2026.3.0
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: sh -c 'cloudflared tunnel --no-autoupdate run --token $$(cat /run/secrets/cloudflare_tunnel_token)'
+    secrets:
+      - cloudflare_tunnel_token
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  better_auth_secret:
+    file: ./secrets/better_auth_secret.txt
+  cloudflare_tunnel_token:
+    file: ./secrets/cloudflare_tunnel_token.txt
+
 volumes:
   postgres_data:
+    external: true

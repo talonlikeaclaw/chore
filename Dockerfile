@@ -9,7 +9,11 @@ ENV NODE_ENV=development
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
+FROM deps AS migrator
+COPY . .
+
 FROM deps AS builder
+ARG NEXT_PUBLIC_BETTER_AUTH_URL
 COPY . .
 RUN npm run build
 
@@ -20,10 +24,12 @@ ENV NODE_ENV=production
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --chown=node:node entrypoint.sh ./
+RUN chmod +x entrypoint.sh
 
 USER node
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["./entrypoint.sh"]

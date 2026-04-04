@@ -10,6 +10,6 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ??
-      `postgresql://${encodeURIComponent(process.env.POSTGRES_USER!)}:${encodeURIComponent(process.env.POSTGRES_PASSWORD!)}@localhost:5432/${process.env.POSTGRES_DB}`,
+      `postgresql://${encodeURIComponent(process.env.POSTGRES_USER!)}:${encodeURIComponent(process.env.POSTGRES_PASSWORD!)}@${process.env.POSTGRES_HOST ?? "localhost"}:5432/${process.env.POSTGRES_DB}`,
   },
 });
