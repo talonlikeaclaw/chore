@@ -60,7 +60,9 @@ services:
     restart: unless-stopped
     depends_on:
       - app
-    command: sh -c 'cloudflared tunnel --no-autoupdate run --token $$(cat /run/secrets/cloudflare_tunnel_token)'
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+    command: tunnel --no-autoupdate run
     secrets:
       - cloudflare_tunnel_token
 
@@ -75,3 +77,4 @@ secrets:
 volumes:
   postgres_data:
     external: true
+    name: chore_postgres_data
