@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { toast } from "sonner"
 import { Check, Pencil, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getDueDate, getOverdueDays } from "@/lib/chores"
-import { updateChore, deleteChore } from "@/lib/actions"
+import { updateChore, deleteChore, undoDeleteChore } from "@/lib/actions"
 
 type ChoreRowProps = {
   chore: {
@@ -57,7 +58,14 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
 
   const handleDelete = () => {
     startTransition(async () => {
-      await deleteChore(chore.id)
+      const deleted = await deleteChore(chore.id)
+      toast(`"${deleted.name}" deleted`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => undoDeleteChore(deleted),
+        },
+      })
     })
   }
 

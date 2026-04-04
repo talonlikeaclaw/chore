@@ -15,6 +15,11 @@ interface NextApiResponseWithSocket extends NextApiResponse {
   socket: SocketWithServer;
 }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var socketio: SocketIOServer | undefined;
+}
+
 export const config = {
   api: {
     bodyParser: false,
@@ -33,9 +38,14 @@ export default function handler(
     });
 
     res.socket.server.io = io;
+    globalThis.socketio = io;
 
     io.on("connection", (socket) => {
       console.log("Socket connected:", socket.id);
+
+      socket.on("join:household", (householdId: string) => {
+        socket.join(`household:${householdId}`);
+      });
 
       socket.on("ping", () => {
         socket.emit("pong");

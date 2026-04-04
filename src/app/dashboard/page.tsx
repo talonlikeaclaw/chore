@@ -16,7 +16,7 @@ export default async function DashboardPage() {
     with: { household: true },
   })
 
-  if (!membership) redirect("/auth/sign-in")
+  if (!membership) redirect("/onboarding")
 
   const roomList = await db.query.rooms.findMany({
     where: eq(rooms.householdId, membership.householdId),
@@ -42,6 +42,7 @@ export default async function DashboardPage() {
     <DashboardView
       rooms={roomList}
       inviteCode={membership.household.inviteCode}
+      householdId={membership.householdId}
     />
   )
 }

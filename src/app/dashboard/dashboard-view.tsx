@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useOptimistic, useTransition } from "react"
+import { useState, useOptimistic, useTransition, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Check, Link2, Plus, X } from "lucide-react"
 import { createRoom, markDone, undoCompletion } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { RoomSection } from "./room-section"
+import { getSocket } from "@/lib/socket"
 
 type Chore = {
   id: string
@@ -27,12 +29,31 @@ type Room = {
 type DashboardViewProps = {
   rooms: Room[]
   inviteCode: string
+  householdId: string
 }
 
-export function DashboardView({ rooms, inviteCode }: DashboardViewProps) {
+export function DashboardView({ rooms, inviteCode, householdId }: DashboardViewProps) {
+  const router = useRouter()
   const [addingRoom, setAddingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
   const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    const socket = getSocket()
+
+    socket.emit("join:household", householdId)
+
+    const refresh = () => router.refresh()
+    socket.on("chore:done", refresh)
+    socket.on("chore:undone", refresh)
+    socket.on("household:updated", refresh)
+
+    return () => {
+      socket.off("chore:done", refresh)
+      socket.off("chore:undone", refresh)
+      socket.off("household:updated", refresh)
+    }
+  }, [householdId, router])
   const [optimisticDoneIds, addOptimisticDone] = useOptimistic(
     new Set<string>(),
     (state, choreId: string) => new Set([...state, choreId])

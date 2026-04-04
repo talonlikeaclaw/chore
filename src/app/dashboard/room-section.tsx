@@ -9,7 +9,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react"
 import { getDueDate, getOverdueDays } from "@/lib/chores"
-import { createChore, deleteRoom, updateRoom } from "@/lib/actions"
+import { toast } from "sonner"
+import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actions"
 import { ChoreRow } from "./chore-row"
 
 type Chore = {
@@ -68,7 +69,14 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
 
   const handleDeleteRoom = () => {
     startTransition(async () => {
-      await deleteRoom(room.id)
+      const deleted = await deleteRoom(room.id)
+      toast(`"${deleted.name}" deleted`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => undoDeleteRoom(deleted),
+        },
+      })
     })
   }
 
