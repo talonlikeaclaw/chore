@@ -49,7 +49,14 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
 
   const handleSave = () => {
     const interval = parseInt(editInterval, 10)
-    if (!editName.trim() || !interval || interval < 1) return
+    if (!editName.trim()) {
+      toast.warning("Enter a chore name")
+      return
+    }
+    if (!interval || interval < 1) {
+      toast.warning("Enter a valid interval in days")
+      return
+    }
     startTransition(async () => {
       await updateChore(chore.id, editName.trim(), interval)
       setEditing(false)

@@ -6,7 +6,7 @@ export function NavBar() {
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-        <span className="font-semibold">Chore Manager</span>
+        <span className="font-semibold">chore</span>
         <UserButton />
       </div>
     </header>

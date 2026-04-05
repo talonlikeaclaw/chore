@@ -38,7 +38,7 @@ function sortByOverdue(chores: Chore[]): Chore[] {
   return [...chores].sort((a, b) => {
     const dueDateA = getDueDate(a, a.completions[0] ?? null)
     const dueDateB = getDueDate(b, b.completions[0] ?? null)
-    return getOverdueDays(dueDateB) - getOverdueDays(dueDateA)
+    return dueDateA.getTime() - dueDateB.getTime()
   })
 }
 
@@ -49,7 +49,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
   const [roomName, setRoomName] = useState(room.name)
   const [addingChore, setAddingChore] = useState(false)
   const [newChoreName, setNewChoreName] = useState("")
-  const [newChoreInterval, setNewChoreInterval] = useState("")
+  const [newChoreInterval, setNewChoreInterval] = useState("7")
   const [, startTransition] = useTransition()
 
   const sorted = sortByOverdue(room.chores)
@@ -82,7 +82,14 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
 
   const handleAddChore = () => {
     const interval = parseInt(newChoreInterval, 10)
-    if (!newChoreName.trim() || !interval || interval < 1) return
+    if (!newChoreName.trim()) {
+      toast.warning("Enter a chore name")
+      return
+    }
+    if (!interval || interval < 1) {
+      toast.warning("Enter a valid interval in days")
+      return
+    }
     startTransition(async () => {
       await createChore(room.id, newChoreName.trim(), interval)
       setNewChoreName("")
@@ -94,7 +101,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
   const cancelAddChore = () => {
     setAddingChore(false)
     setNewChoreName("")
-    setNewChoreInterval("")
+    setNewChoreInterval("7")
   }
 
   const header = (() => {
@@ -195,7 +202,6 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
                 className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 type="number"
                 min="1"
-                placeholder="7"
                 value={newChoreInterval}
                 onChange={(e) => setNewChoreInterval(e.target.value)}
                 onKeyDown={(e) => {
