@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react"
-import { getDueDate, getOverdueDays } from "@/lib/chores"
+import { getDueDate } from "@/lib/chores"
 import { toast } from "sonner"
 import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actions"
 import { ChoreRow } from "./chore-row"
@@ -109,7 +109,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
       return (
         <div className="flex items-center gap-2 py-2">
           <input
-            className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-ring"
+            className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground font-semibold focus:outline-none focus:ring-1 focus:ring-ring"
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
             onKeyDown={(e) => {
@@ -188,7 +188,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
           {addingChore ? (
             <div className="flex items-center gap-2 py-3">
               <input
-                className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="Chore name"
                 value={newChoreName}
                 onChange={(e) => setNewChoreName(e.target.value)}
@@ -199,7 +199,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
                 autoFocus
               />
               <input
-                className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 type="number"
                 min="1"
                 value={newChoreInterval}

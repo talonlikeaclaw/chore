@@ -86,7 +86,7 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
     return (
       <div className="flex items-center gap-2 py-3">
         <input
-          className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={(e) => {
@@ -96,7 +96,7 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
           autoFocus
         />
         <input
-          className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           type="number"
           min="1"
           value={editInterval}
