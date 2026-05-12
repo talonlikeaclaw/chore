@@ -1,0 +1,21 @@
+services:
+  db:
+    deploy:
+      replicas: 0
+
+  migrate:
+    depends_on: {}
+    environment:
+      POSTGRES_HOST: 192.168.0.212
+
+  app:
+    environment:
+      POSTGRES_HOST: 192.168.0.212
+
+  cloudflared:
+    deploy:
+      replicas: 0
+
+volumes:
+  postgres_data:
+    external: false
