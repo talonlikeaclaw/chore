@@ -40,6 +40,7 @@ Self-hosted household chore tracker for two users. Chores belong to rooms, have 
 12. **Onboarding flow** — New users without household redirected to `/onboarding`. `src/app/onboarding/page.tsx` (server, auth-guarded) renders `OnboardingView` client component with two panels: create household or join with invite code.
 13. **Socket.io real-time events** — All server actions emit events to `household:{householdId}` rooms. Completions emit `chore:done`/`chore:undone`; room/chore mutations emit `household:updated`. `DashboardView` joins household room on mount and calls `router.refresh()` on any event.
 14. **Production Docker + Cloudflare Tunnel** — `docker-compose.yml` uses Docker Compose secrets. `migrate` service runs `npx drizzle-kit migrate` after db health check. `app` service reads secrets via `entrypoint.sh`. `cloudflared` service uses native `TUNNEL_TOKEN_FILE` env var. `postgres_data` is external named volume (`chore_postgres_data`).
+15. **Mobile UX + Maple Mono NF** — Font face loaded via `@font-face` in `globals.css` (woff2 in `public/fonts/`). Custom `icon-touch` button size (44px) for edit/delete. Interval inputs widened. Mark Done button full-width on mobile. Household header stacks vertically on mobile. Safe area padding for notched phones. Viewport locked to prevent zooming.
 
 ## Known issues
 None currently known.
@@ -56,6 +57,22 @@ Nothing — all core features complete.
 6. **History screen** — log of completions with who/when
 7. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection — `getDueDate`/`getOverdueDays` already tested)
 
+## Dev workflow
+- **Dev:** `docker compose -f docker-compose.dev.yml up` — hot reload via compose watch, no rebuild needed for source changes
+- **⚠️ New directories in `public/` or `src/`:** Compose watch only tracks changes to existing directories. Adding a new directory (e.g. `public/fonts/`) requires a one-time image rebuild: `docker compose -f docker-compose.dev.yml build app`. After that, compose watch picks up changes normally.
+- **Quick container file update (no rebuild):** `docker cp path/to/file container:/app/path/` — useful for hot-fixing without rebuilding the image. The dev server picks it up on next request.
+- **Migrations (local):** `npx drizzle-kit migrate` (runs against localhost:5432, requires postgres container running with port 5432 exposed)
+- **Engram memory sync:** Run `engram sync` after any `mem_save` call to export memories to `.engram/` for git-based sharing. Then `git add .engram/` and commit.
+  ```bash
+  engram sync
+  git add .engram/ && git commit -m "sync engram memories"
+  ```
+  On another machine: `engram sync --import` after pulling. The `engram.db` file (at the engram config directory, not project root) should be gitignored — it's the local-only DB. Only `.engram/` (manifest + chunks) is meant for git.
+- **Prod:** `docker compose up --build -d` — migrations run automatically via the `migrate` service before app starts
+- **Prod secrets:** stored in `secrets/` directory (gitignored): `postgres_password.txt`, `better_auth_secret.txt`, `cloudflare_tunnel_token.txt`
+- **Prod volume:** `docker volume create chore_postgres_data` must exist before first deploy
+- Commit directly to main, no branch/PR workflow
+
 ## Dev setup (first time)
 ```bash
 cp .env.example .env
@@ -63,6 +80,8 @@ cp .env.example .env
 docker volume create chore_postgres_data
 docker compose -f docker-compose.dev.yml up
 npx drizzle-kit migrate  # run after container is up
+# Rebuild to include fonts directory (compose watch doesn't track new directories)
+docker compose -f docker-compose.dev.yml build app
 ```
 
 ## Dev workflow
