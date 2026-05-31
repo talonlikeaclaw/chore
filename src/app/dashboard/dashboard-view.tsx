@@ -3,7 +3,7 @@
 import { useState, useOptimistic, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Check, Link2, Plus, X } from "lucide-react"
+import { Check, Link2, Loader2, Plus, X } from "lucide-react"
 import { createRoom, markDone, undoCompletion } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { RoomSection } from "./room-section"
@@ -30,13 +30,14 @@ type DashboardViewProps = {
   rooms: Room[]
   inviteCode: string
   householdId: string
+  householdName: string
 }
 
-export function DashboardView({ rooms, inviteCode, householdId }: DashboardViewProps) {
+export function DashboardView({ rooms, inviteCode, householdId, householdName }: DashboardViewProps) {
   const router = useRouter()
   const [addingRoom, setAddingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
     const socket = getSocket()
@@ -95,7 +96,11 @@ export function DashboardView({ rooms, inviteCode, householdId }: DashboardViewP
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">{householdName}</h1>
+          {isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
         <Button variant="outline" size="sm" onClick={handleCopyInvite}>
           <Link2 className="h-4 w-4" />
           Copy invite link

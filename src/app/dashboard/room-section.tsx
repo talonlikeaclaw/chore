@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
-import { Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2, X } from "lucide-react"
 import { getDueDate } from "@/lib/chores"
 import { toast } from "sonner"
 import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actions"
@@ -50,7 +50,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
   const [addingChore, setAddingChore] = useState(false)
   const [newChoreName, setNewChoreName] = useState("")
   const [newChoreInterval, setNewChoreInterval] = useState("7")
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
 
   const sorted = sortByOverdue(room.chores)
 
@@ -134,12 +134,18 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
           <span className="text-sm">
             Delete &ldquo;{room.name}&rdquo; and all its chores?
           </span>
-          <Button size="sm" variant="destructive" onClick={handleDeleteRoom}>
-            Delete
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-            Cancel
-          </Button>
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Button size="sm" variant="destructive" onClick={handleDeleteRoom}>
+                Delete
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </Button>
+            </>
+          )}
         </div>
       )
     }
@@ -177,6 +183,11 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
       {header}
       <CollapsibleContent>
         <div className="divide-y rounded-md border px-4">
+          {sorted.length === 0 && !addingChore && (
+            <p className="py-3 text-sm text-muted-foreground">
+              No chores yet
+            </p>
+          )}
           {sorted.map((chore) => (
             <ChoreRow
               key={chore.id}

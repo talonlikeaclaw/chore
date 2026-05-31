@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { Check, Pencil, Trash2, X } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getDueDate, getOverdueDays } from "@/lib/chores"
@@ -28,7 +28,7 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editName, setEditName] = useState(chore.name)
   const [editInterval, setEditInterval] = useState(String(chore.intervalDays))
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
 
   const lastCompletion = chore.completions[0] ?? null
   const dueDate = getDueDate(chore, lastCompletion)
@@ -121,12 +121,18 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
     return (
       <div className="flex items-center gap-3 py-3">
         <span className="text-sm">Delete &ldquo;{chore.name}&rdquo;?</span>
-        <Button size="sm" variant="destructive" onClick={handleDelete}>
-          Delete
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-          Cancel
-        </Button>
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Button size="sm" variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+          </>
+        )}
       </div>
     )
   }
