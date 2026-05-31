@@ -43,6 +43,7 @@ export default async function DashboardPage() {
       rooms={roomList}
       inviteCode={membership.household.inviteCode}
       householdId={membership.householdId}
+      householdName={membership.household.name}
     />
   )
 }
