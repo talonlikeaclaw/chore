@@ -96,12 +96,12 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">{householdName}</h1>
           {isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
-        <Button variant="outline" size="sm" onClick={handleCopyInvite}>
+        <Button variant="outline" size="sm" className="self-start sm:self-auto" onClick={handleCopyInvite}>
           <Link2 className="h-4 w-4" />
           Copy invite link
         </Button>

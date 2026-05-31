@@ -5,7 +5,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <NavBar />
-      <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
+      <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 pb-[env(safe-area-inset-bottom)]">
         {children}
       </div>
     </div>

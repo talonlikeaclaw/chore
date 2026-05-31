@@ -107,7 +107,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
   const header = (() => {
     if (editingName) {
       return (
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex min-h-[44px] items-center gap-2 py-2">
           <input
             className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground font-semibold focus:outline-none focus:ring-1 focus:ring-ring"
             value={roomName}
@@ -118,11 +118,11 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
             }}
             autoFocus
           />
-          <Button size="icon-sm" variant="ghost" onClick={handleSaveRoom}>
-            <Check className="h-3.5 w-3.5" />
+          <Button size="icon-touch" variant="ghost" onClick={handleSaveRoom}>
+            <Check className="h-4 w-4" />
           </Button>
-          <Button size="icon-sm" variant="ghost" onClick={cancelEditRoom}>
-            <X className="h-3.5 w-3.5" />
+          <Button size="icon-touch" variant="ghost" onClick={cancelEditRoom}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
       )
@@ -161,18 +161,18 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
           {room.name}
         </CollapsibleTrigger>
         <Button
-          size="icon-sm"
+          size="icon-touch"
           variant="ghost"
           onClick={() => setEditingName(true)}
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-4 w-4" />
         </Button>
         <Button
-          size="icon-sm"
+          size="icon-touch"
           variant="ghost"
           onClick={() => setConfirmDelete(true)}
         >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       </div>
     )
@@ -197,7 +197,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
             />
           ))}
           {addingChore ? (
-            <div className="flex items-center gap-2 py-3">
+            <div className="flex min-h-[44px] items-center gap-2 py-3">
               <input
                 className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="Chore name"
@@ -210,7 +210,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
                 autoFocus
               />
               <input
-                className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 type="number"
                 min="1"
                 value={newChoreInterval}
@@ -221,19 +221,19 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
                 }}
               />
               <span className="shrink-0 text-xs text-muted-foreground">days</span>
-              <Button size="icon-sm" variant="ghost" onClick={handleAddChore}>
-                <Check className="h-3.5 w-3.5" />
+              <Button size="icon-touch" variant="ghost" onClick={handleAddChore}>
+                <Check className="h-4 w-4" />
               </Button>
-              <Button size="icon-sm" variant="ghost" onClick={cancelAddChore}>
-                <X className="h-3.5 w-3.5" />
+              <Button size="icon-touch" variant="ghost" onClick={cancelAddChore}>
+                <X className="h-4 w-4" />
               </Button>
             </div>
           ) : (
             <button
-              className="flex w-full items-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+              className="flex min-h-[44px] w-full items-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground"
               onClick={() => setAddingChore(true)}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Add chore
             </button>
           )}

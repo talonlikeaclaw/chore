@@ -84,7 +84,7 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2 py-3">
+      <div className="flex min-h-[44px] items-center gap-2 py-3">
         <input
           className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           value={editName}
@@ -96,7 +96,7 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
           autoFocus
         />
         <input
-          className="w-14 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           type="number"
           min="1"
           value={editInterval}
@@ -107,11 +107,11 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
           }}
         />
         <span className="shrink-0 text-xs text-muted-foreground">days</span>
-        <Button size="icon-sm" variant="ghost" onClick={handleSave}>
-          <Check className="h-3.5 w-3.5" />
+        <Button size="icon-touch" variant="ghost" onClick={handleSave}>
+          <Check className="h-4 w-4" />
         </Button>
-        <Button size="icon-sm" variant="ghost" onClick={cancelEdit}>
-          <X className="h-3.5 w-3.5" />
+        <Button size="icon-touch" variant="ghost" onClick={cancelEdit}>
+          <X className="h-4 w-4" />
         </Button>
       </div>
     )
@@ -162,7 +162,8 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button
-          size="sm"
+          size="lg"
+          className="flex-1 sm:flex-initial text-sm sm:text-base"
           variant={isOptimisticallyDone ? "secondary" : "default"}
           disabled={isOptimisticallyDone}
           onClick={() => onMarkDone(chore.id)}
@@ -170,18 +171,18 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
           {isOptimisticallyDone ? "Done" : "Mark Done"}
         </Button>
         <Button
-          size="icon-sm"
+          size="icon-touch"
           variant="ghost"
           onClick={() => setEditing(true)}
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-4 w-4" />
         </Button>
         <Button
-          size="icon-sm"
+          size="icon-touch"
           variant="ghost"
           onClick={() => setConfirmDelete(true)}
         >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       </div>
     </div>
