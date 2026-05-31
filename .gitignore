@@ -37,6 +37,9 @@ yarn-error.log*
 # docker secrets
 /secrets
 
+# engram local DB (manifest/chunks go to git, not this)
+engram.db
+
 # vercel
 .vercel
 
