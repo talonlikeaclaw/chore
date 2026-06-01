@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 
@@ -87,11 +87,37 @@ export async function undoCompletion(completionId: string): Promise<void> {
 
 export async function createRoom(name: string): Promise<void> {
   const householdId = await getUserHouseholdId()
+  const maxOrder = await db
+    .select({ max: sql<number>`MAX(${rooms.sortOrder})` })
+    .from(rooms)
+    .where(eq(rooms.householdId, householdId))
+  const sortOrder = (maxOrder[0]?.max ?? -1) + 1
   await db.insert(rooms).values({
     id: crypto.randomUUID(),
     name,
     householdId,
+    sortOrder,
   })
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+}
+
+export async function reorderRooms(roomIds: string[]): Promise<void> {
+  const householdId = await getUserHouseholdId()
+  const existingRooms = await db.query.rooms.findMany({
+    where: eq(rooms.householdId, householdId),
+  })
+  const roomMap = new Map(existingRooms.map((r) => [r.id, r]))
+  for (let i = 0; i < roomIds.length; i++) {
+    const room = roomMap.get(roomIds[i])
+    if (!room) continue
+    if (room.sortOrder !== i) {
+      await db
+        .update(rooms)
+        .set({ sortOrder: i })
+        .where(and(eq(rooms.id, roomIds[i]), eq(rooms.householdId, householdId)))
+    }
+  }
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
 }

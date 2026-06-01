@@ -3,8 +3,24 @@
 import { useState, useOptimistic, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+  DndContext,
+  DragOverlay,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable"
 import { Check, Link2, Loader2, Plus, X } from "lucide-react"
-import { createRoom, markDone, undoCompletion } from "@/lib/actions"
+import { createRoom, markDone, reorderRooms, undoCompletion } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { RoomSection } from "./room-section"
 import { getSocket } from "@/lib/socket"
@@ -23,6 +39,7 @@ type Chore = {
 type Room = {
   id: string
   name: string
+  sortOrder: number
   chores: Chore[]
 }
 
@@ -38,6 +55,13 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
   const [addingRoom, setAddingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   useEffect(() => {
     const socket = getSocket()
@@ -55,9 +79,18 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
       socket.off("household:updated", refresh)
     }
   }, [householdId, router])
+
   const [optimisticDoneIds, addOptimisticDone] = useOptimistic(
     new Set<string>(),
     (state, choreId: string) => new Set([...state, choreId])
+  )
+
+  const [optimisticRooms, setOptimisticRooms] = useOptimistic(
+    rooms,
+    (state, { roomIds }: { roomIds: string[] }) => {
+      const roomMap = new Map(state.map((r) => [r.id, r]))
+      return roomIds.map((id) => roomMap.get(id)!).filter(Boolean)
+    }
   )
 
   const handleCopyInvite = () => {
@@ -94,6 +127,27 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
     setNewRoomName("")
   }
 
+  const handleDragStart = (event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id))
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+    if (!over || active.id === over.id) return
+    const currentIds = rooms.map((r) => r.id)
+    const oldIndex = currentIds.indexOf(String(active.id))
+    const newIndex = currentIds.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    const newOrder = arrayMove(currentIds, oldIndex, newIndex)
+    startTransition(async () => {
+      setOptimisticRooms({ roomIds: newOrder })
+      await reorderRooms(newOrder)
+    })
+  }
+
+  const activeRoom = activeId ? rooms.find((r) => r.id === activeId) : null
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -106,19 +160,35 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
           Copy invite link
         </Button>
       </div>
-      {rooms.length === 0 && !addingRoom && (
+      {optimisticRooms.length === 0 && !addingRoom && (
         <p className="text-center text-muted-foreground">
           No rooms yet. Add a room to get started.
         </p>
       )}
-      {rooms.map((room) => (
-        <RoomSection
-          key={room.id}
-          room={room}
-          optimisticDoneIds={optimisticDoneIds}
-          onMarkDone={handleMarkDone}
-        />
-      ))}
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={optimisticRooms.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+          {optimisticRooms.map((room) => (
+            <RoomSection
+              key={room.id}
+              room={room}
+              optimisticDoneIds={optimisticDoneIds}
+              onMarkDone={handleMarkDone}
+              isDragActive={room.id === activeId}
+            />
+          ))}
+        </SortableContext>
+        <DragOverlay>
+          {activeRoom ? (
+            <div className="rounded-md border bg-card p-3 opacity-80 shadow-lg">
+              <span className="font-semibold">{activeRoom.name}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
       {addingRoom ? (
         <div className="flex items-center gap-2">
           <input

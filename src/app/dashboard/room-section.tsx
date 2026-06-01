@@ -7,11 +7,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
-import { Check, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, GripVertical, Loader2, Pencil, Plus, Trash2, X } from "lucide-react"
 import { getDueDate } from "@/lib/chores"
 import { toast } from "sonner"
 import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actions"
 import { ChoreRow } from "./chore-row"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 type Chore = {
   id: string
@@ -28,10 +30,12 @@ type RoomSectionProps = {
   room: {
     id: string
     name: string
+    sortOrder: number
     chores: Chore[]
   }
   optimisticDoneIds: Set<string>
   onMarkDone: (choreId: string) => void
+  isDragActive?: boolean
 }
 
 function sortByOverdue(chores: Chore[]): Chore[] {
@@ -42,7 +46,7 @@ function sortByOverdue(chores: Chore[]): Chore[] {
   })
 }
 
-export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSectionProps) {
+export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive }: RoomSectionProps) {
   const [open, setOpen] = useState(true)
   const [editingName, setEditingName] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -51,6 +55,20 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
   const [newChoreName, setNewChoreName] = useState("")
   const [newChoreInterval, setNewChoreInterval] = useState("7")
   const [isPending, startTransition] = useTransition()
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: room.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   const sorted = sortByOverdue(room.chores)
 
@@ -152,6 +170,15 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
 
     return (
       <div className="flex items-center">
+        <button
+          className="shrink-0 rounded p-1 hover:bg-muted"
+          style={{ touchAction: "none" }}
+          {...attributes}
+          {...listeners}
+          suppressHydrationWarning
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </button>
         <CollapsibleTrigger className="flex flex-1 items-center gap-2 rounded-md py-2 font-semibold hover:text-muted-foreground">
           {open ? (
             <ChevronDown className="h-4 w-4 shrink-0" />
@@ -178,67 +205,87 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone }: RoomSection
     )
   })()
 
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      {header}
-      <CollapsibleContent>
-        <div className="divide-y rounded-md border px-4">
-          {sorted.length === 0 && !addingChore && (
-            <p className="py-3 text-sm text-muted-foreground">
-              No chores yet
-            </p>
-          )}
-          {sorted.map((chore) => (
-            <ChoreRow
-              key={chore.id}
-              chore={chore}
-              isOptimisticallyDone={optimisticDoneIds.has(chore.id)}
-              onMarkDone={onMarkDone}
-            />
-          ))}
-          {addingChore ? (
-            <div className="flex min-h-[44px] items-center gap-2 py-3">
-              <input
-                className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Chore name"
-                value={newChoreName}
-                onChange={(e) => setNewChoreName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddChore()
-                  if (e.key === "Escape") cancelAddChore()
-                }}
-                autoFocus
-              />
-              <input
-                className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                type="number"
-                min="1"
-                value={newChoreInterval}
-                onChange={(e) => setNewChoreInterval(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddChore()
-                  if (e.key === "Escape") cancelAddChore()
-                }}
-              />
-              <span className="shrink-0 text-xs text-muted-foreground">days</span>
-              <Button size="icon-touch" variant="ghost" onClick={handleAddChore}>
-                <Check className="h-4 w-4" />
-              </Button>
-              <Button size="icon-touch" variant="ghost" onClick={cancelAddChore}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <button
-              className="flex min-h-[44px] w-full items-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => setAddingChore(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add chore
-            </button>
-          )}
+  if (isDragActive) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="opacity-50"
+      >
+        <div className="flex items-center py-2 font-semibold">
+          <GripVertical className="mr-1 h-4 w-4 text-muted-foreground" />
+          {room.name}
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+    >
+      <Collapsible open={open} onOpenChange={setOpen}>
+        {header}
+        <CollapsibleContent>
+          <div className="divide-y rounded-md border px-4">
+            {sorted.length === 0 && !addingChore && (
+              <p className="py-3 text-sm text-muted-foreground">
+                No chores yet
+              </p>
+            )}
+            {sorted.map((chore) => (
+              <ChoreRow
+                key={chore.id}
+                chore={chore}
+                isOptimisticallyDone={optimisticDoneIds.has(chore.id)}
+                onMarkDone={onMarkDone}
+              />
+            ))}
+            {addingChore ? (
+              <div className="flex min-h-[44px] items-center gap-2 py-3">
+                <input
+                  className="min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="Chore name"
+                  value={newChoreName}
+                  onChange={(e) => setNewChoreName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddChore()
+                    if (e.key === "Escape") cancelAddChore()
+                  }}
+                  autoFocus
+                />
+                <input
+                  className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  type="number"
+                  min="1"
+                  value={newChoreInterval}
+                  onChange={(e) => setNewChoreInterval(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddChore()
+                    if (e.key === "Escape") cancelAddChore()
+                  }}
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">days</span>
+                <Button size="icon-touch" variant="ghost" onClick={handleAddChore}>
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button size="icon-touch" variant="ghost" onClick={cancelAddChore}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <button
+                className="flex min-h-[44px] w-full items-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => setAddingChore(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add chore
+              </button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   )
 }

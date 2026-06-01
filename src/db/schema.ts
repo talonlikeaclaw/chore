@@ -110,6 +110,7 @@ export const rooms = pgTable("room", {
   householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -1,6 +1,6 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { desc, eq } from "drizzle-orm"
+import { asc, desc, eq } from "drizzle-orm"
 
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
@@ -20,6 +20,7 @@ export default async function DashboardPage() {
 
   const roomList = await db.query.rooms.findMany({
     where: eq(rooms.householdId, membership.householdId),
+    orderBy: [asc(rooms.sortOrder)],
     with: {
       chores: {
         where: eq(chores.active, true),
