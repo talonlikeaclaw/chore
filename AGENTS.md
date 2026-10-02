@@ -1,132 +1,142 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code. Heed deprecation notices.
+
 <!-- END:nextjs-agent-rules -->
 
 ---
 
 # Project Handoff — Chore Manager
 
-## What this app is
-Self-hosted household chore tracker for two users. Chores belong to rooms, have recurrence interval, users mark them done. Completions logged with who + when. Due dates = last completion + interval, counted as calendar days in the household's IANA timezone (`household.timezone`). Overdue chores highlighted. Real-time updates via Socket.io.
+Self-hosted household chore tracker. Households have rooms; rooms have chores with a recurrence interval; members mark chores done, and completions record who and when. Due/overdue are **calendar days in the household's IANA timezone**, not durations. Real-time updates over Socket.io.
+
+Developed with AI coding agents, directed and reviewed by a human who commits, tags, and deploys. This file is the handoff doc: keep it current — delete stale lines instead of appending history.
 
 ## Working style
-**Work one piece at a time.** User reviews between each step. Stop after each logical chunk.
 
-**User commits manually.** Present work, wait. Commit directly to `main`. No branch/PR workflow. May add GitHub Actions CI in future if worth overhead.
+- One piece at a time: the user reviews between chunks and commits manually to `main`. No branches, no PRs.
+- Before presenting work: `npm run test:run`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. All four are clean today, with three pre-existing exceptions: eslint reports 2 warnings (`isDragging` unused in `room-section.tsx`, a stale disable in `pages/api/socketio.ts`) and `tsc` flags the 3 test files that use vitest globals without importing them.
+- Commit messages are plain imperative summaries. Releases are annotated git tags — see **Releases**.
 
-## Tech stack
+## Stack
+
 - **Next.js 16** (App Router) — read `node_modules/next/dist/docs/` before writing Next.js code
-- **Socket.io** — via `pages/api/socketio.ts` (Pages Router API route), client singleton in `src/lib/socket.ts`
-- **Better Auth** — email/password auth, Drizzle adapter, route handler at `src/app/api/auth/[...all]/route.ts`
-- **Drizzle ORM + pg** — `src/db/index.ts` exports `db` singleton (globalThis pattern for dev HMR), schema at `src/db/schema.ts`
-- **Postgres** — runs in Docker Compose, credentials from `.env`
-- **ShadCN + Tailwind v4**
-- **Vitest + Testing Library** — unit tests, setup in `src/test/setup.ts`
+- **Drizzle ORM + `pg`**, Postgres 18 in Docker Compose
+- **Better Auth** (email/password) + **`@daveyplate/better-auth-ui`** for account UI
+- **Socket.io**, mounted through a Pages Router API route
+- **Base UI primitives + Tailwind v4** (ShadCN-style wrappers in `src/components/ui`)
+- **Vitest + Testing Library** (jsdom)
 
-## What's been completed
-1. **Project scaffolding** — Next.js init, all deps installed, ShadCN initialized
-2. **Docker setup** — `Dockerfile` (node:24-bullseye-slim, multistage: `deps`, `dev`, `migrator`, `builder`, `runner`), `docker-compose.yml` (prod), `docker-compose.dev.yml` (dev with compose watch, syncs `src/` and `public/`, rebuilds on package.json changes), `.dockerignore`. Postgres 18+ uses `/var/lib/postgresql` (not `/var/lib/postgresql/data`) as volume mount point.
-3. **Socket.io** — `src/pages/api/socketio.ts` initializes Socket.io server on `res.socket.server`, stores instance on `globalThis.socketio`. Client singleton in `src/lib/socket.ts`
-4. **DB connection** — `src/db/index.ts` with globalThis singleton pattern. Constructs URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` with `encodeURIComponent` (safe for special chars in passwords). `POSTGRES_HOST` defaults to `localhost`; compose sets it to `db`. Never construct `DATABASE_URL` via shell interpolation in compose — special chars in passwords break URL parsing.
-5. **Better Auth** — `src/lib/auth.ts` with Drizzle adapter + email/password enabled. Auth schema generated via `npx @better-auth/cli generate` into `src/db/schema.ts` (user, session, account, verification tables). No auto-household creation on signup — onboarding handles this.
-6. **Initial migration** — `drizzle/0000_white_mattie_franklin.sql` generated via `npx drizzle-kit generate`. `drizzle.config.ts` uses `@next/env` to load `.env` and falls back to constructing URL from individual vars. Uses `POSTGRES_HOST` env var (defaults to `localhost`).
-7. **Auth UI** — `@daveyplate/better-auth-ui` installed. Auth client at `src/lib/auth-client.ts`, `AuthUIProvider` in `src/app/providers.tsx` (with `redirectTo="/dashboard"`), Sonner `<Toaster />` in layout, dynamic auth route at `src/app/auth/[path]/page.tsx`. Requires `@import "@daveyplate/better-auth-ui/css"` in `globals.css` for Tailwind v4.
-8. **Dashboard** — `/` welcome page, `/dashboard` server component with auth guard (`auth.api.getSession`), chores grouped by collapsible rooms ordered by overdue days. Mark-done via Server Action with `useOptimistic` + Sonner undo toaster (5s window). Pure functions in `src/lib/chores.ts` (`getDueDate`, `getOverdueDays`). Dark mode via `dark` class on `<html>`.
-9. **Households** — `household` and `household_member` tables. `getUserHouseholdId()` helper in `actions.ts` gates all CRUD. `inviteCode` on dashboard via "Copy invite link" button. Invite link at `/join/[inviteCode]`.
-10. **Chore management** — Inline create/edit/delete for rooms and chores. `RoomSection` (`src/app/dashboard/room-section.tsx`) handles collapsible rooms with edit/delete/add-chore. `ChoreRow` (`src/app/dashboard/chore-row.tsx`) handles inline edit/delete per chore. All actions in `src/lib/actions.ts` with household authorization.
-11. **Settings page** — `src/app/settings/[[...account]]/page.tsx` using `<AccountView />` from `@daveyplate/better-auth-ui`. Auth-guarded with redirect to sign-in.
-12. **Onboarding flow** — New users without household redirected to `/onboarding`. `src/app/onboarding/page.tsx` (server, auth-guarded) renders `OnboardingView` client component with two panels: create household or join with invite code.
-13. **Socket.io real-time events** — All server actions emit events to `household:{householdId}` rooms. Completions emit `chore:done`/`chore:undone`; room/chore mutations emit `household:updated`. `DashboardView` joins household room on mount and calls `router.refresh()` on any event.
-14. **Production Docker + Cloudflare Tunnel** — `docker-compose.yml` uses Docker Compose secrets. `migrate` service runs `npx drizzle-kit migrate` after db health check. `app` service reads secrets via `entrypoint.sh`. `cloudflared` service uses native `TUNNEL_TOKEN_FILE` env var. `postgres_data` is external named volume (`chore_postgres_data`).
-15. **Mobile UX + Maple Mono NF** — Font face loaded via `@font-face` in `globals.css` (woff2 in `public/fonts/`). Custom `icon-touch` button size (44px) for edit/delete. Interval inputs widened. Mark Done button full-width on mobile. Household header stacks vertically on mobile. Safe area padding for notched phones. Viewport locked to prevent zooming.
-16. **Household timezone** — `household.timezone` (IANA string, default `UTC`, migration `drizzle/0004_cold_weapon_omega.sql`). All date math in `src/lib/timezone.ts`: instants are converted to civil dates (UTC-midnight `Date` objects) in the household zone, so due/overdue flip at that zone's local midnight. `src/lib/chores.ts` (`getDueDate`, `getDaysUntilDue`, `getOverdueDays`) takes `timeZone`; components take `timeZone` + `now` props from the server render (no `new Date()` in the render path), so SSR and hydration agree. Timezone is chosen at household creation (defaulted from the browser in `OnboardingView`) and editable at `/household` via `updateHouseholdTimezone`.
-17. **Timezone picker** — `src/components/timezone-combobox.tsx` (Base UI `Autocomplete`): type-to-filter over the 419-zone list, ranked exact → prefix → substring → in-order subsequence by `matchTimeZoneOptions`, separators ignored (`new york` matches `America/New_York`); each row shows its current offset from `getTimeZoneOffsetLabel`. Options (`TimeZoneOption[]` = `{ timeZone, offsetLabel }`) are computed server-side by `getTimeZoneOptions()` and passed as props, so the list is hydration-stable. The input text *is* the value — callers gate on `isValidTimeZone`.
-18. **Household settings** — `/household` (`src/app/household/`) shows the household name (inline rename via `updateHouseholdName`), member count, the timezone picker, and a danger zone: `leaveHousehold` (blocked when you're the last member) or, for a sole member, `deleteHousehold` (cascades rooms/chores/completions). Entry point is the house-icon "Household" item in the better-auth-ui `UserButton` menu (`additionalLinks` in `nav-bar.tsx`), not a nav-bar icon; the same menu's library entry is relabelled `SETTINGS: "Account"` so the two entries don't both read "Settings". better-auth-ui's account sidebar (`AccountView`) builds `navItems` from a hardcoded array, so "Household" cannot be added as a tab there.
+## Layout
 
-## Known issues
-None currently known.
+- Routes: `/` welcome · `/dashboard` · `/onboarding` · `/join/[inviteCode]` · `/household` · `/account/[[...settings]]` · `/auth/[path]` · `/api/auth/[...all]` · `/api/socketio` (Pages Router)
+- `src/lib/actions.ts` — all 16 Server Actions; every one is scoped by `getUserHouseholdId()`
+- `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — due/overdue · `src/lib/socket.ts` — client singleton
+- `src/db/schema.ts` — single source of schema truth · `src/db/index.ts` — `db` singleton (globalThis, for dev HMR)
+- `src/components/ui/*` — Base UI wrappers · `src/components/timezone-combobox.tsx` — the zone picker
 
-## What's in progress
-Nothing — all core features complete.
+## Invariants
 
-## What's next (in order)
-1. ~~**App schema**~~ — done
-2. ~~**Dashboard**~~ — done
-3. ~~**Chore management**~~ — done
-4. ~~**Settings page**~~ — done
-5. ~~**Socket.io events**~~ — done
-6. **History screen** — log of completions with who/when
-7. **Unit tests** — Vitest tests for business logic (due date calculation, overdue detection — `getDueDate`/`getOverdueDays` already tested)
+Breaking one of these regresses something silently.
 
-## Dev workflow
-- **Dev:** `docker compose -f docker-compose.dev.yml up` — hot reload via compose watch, no rebuild needed for source changes
-- **⚠️ New directories in `public/` or `src/`:** Compose watch only tracks changes to existing directories. Adding a new directory (e.g. `public/fonts/`) requires a one-time image rebuild: `docker compose -f docker-compose.dev.yml build app`. After that, compose watch picks up changes normally.
-- **Quick container file update (no rebuild):** `docker cp path/to/file container:/app/path/` — useful for hot-fixing without rebuilding the image. The dev server picks it up on next request.
-- **Migrations (local):** `npx drizzle-kit migrate` (runs against localhost:5432, requires postgres container running with port 5432 exposed)
-- **Engram memory sync:** Run `engram sync` after any `mem_save` call to export memories to `.engram/` for git-based sharing. Then `git add .engram/` and commit.
-  ```bash
-  engram sync
-  git add .engram/ && git commit -m "sync engram memories"
-  ```
-  On another machine: `engram sync --import` after pulling. The `engram.db` file (at the engram config directory, not project root) should be gitignored — it's the local-only DB. Only `.engram/` (manifest + chunks) is meant for git.
-- **Prod:** `docker compose up --build -d` — migrations run automatically via the `migrate` service before app starts
-- **Prod secrets:** stored in `secrets/` directory (gitignored): `postgres_password.txt`, `better_auth_secret.txt`, `cloudflare_tunnel_token.txt`
-- **Prod volume:** `docker volume create chore_postgres_data` must exist before first deploy
-- Commit directly to main, no branch/PR workflow
+### Dates and timezones
 
-## Dev setup (first time)
-```bash
-cp .env.example .env
-# Edit .env — set BETTER_AUTH_SECRET to a random string
-docker volume create chore_postgres_data
-docker compose -f docker-compose.dev.yml up
-npx drizzle-kit migrate  # run after container is up
-# Rebuild to include fonts directory (compose watch doesn't track new directories)
-docker compose -f docker-compose.dev.yml build app
-```
+- Instants are converted to **civil dates**: a `Date` at UTC midnight whose Y-M-D is meaningful in the household's zone. Never treat a civil date as an instant.
+- `household.timezone` is household-wide, not per-user — overdueness is a shared concept.
+- Due/overdue are calendar days, so `getDueDate`/`getDaysUntilDue`/`getOverdueDays` all take `timeZone`; they flip at the household's local midnight.
+- Components receive `timeZone` and `now` as props from the server render. **No `new Date()` / `Date.now()` anywhere in a render path** — that is what keeps SSR and hydration byte-identical.
+- Timezone options come from `getTimeZoneOptions()` on the server (hydration-stable, and offsets are resolved with full ICU); the browser's `Intl.supportedValuesOf` is deliberately not used. Node 24 slim ships full ICU.
+
+### Household authority
+
+- Actions resolve the caller's household through `getUserHouseholdId()` and scope every query to it; nothing crosses household boundaries.
+- `leaveHousehold` refuses when the caller is the last member; `deleteHousehold` is allowed only for a sole member and cascades rooms → chores → completions.
+- `role` (`owner`/`member`) is written at join time and **never read** — no ownership semantics exist yet.
+
+### Rendering and client boundaries
+
+- Reuse the inline-edit pattern for rename/edit UIs: pencil → input → check/cross, Enter to save, Escape to cancel.
+- A function prop on a `"use client"` entry component raises Next's TS warning 71007; the repo tolerates it (e.g. `ChoreRow`'s `onMarkDone`).
+- Never call `setState` inside `useEffect` — `react-hooks/set-state-in-effect` is an eslint error here. Derive from props/state, or use `useSyncExternalStore` for client-only values (see the browser-timezone detection in `OnboardingView`).
+
+### Better Auth UI
+
+- The household entry lives in the `UserButton` menu via `additionalLinks` (`nav-bar.tsx`), and the library's own entry is relabelled `SETTINGS: "Account"` so the menu never shows two "Settings".
+- `AccountView`'s sidebar builds `navItems` from a hardcoded array in the library — a "Household" tab cannot be added there. That is why `/household` is its own page.
+- Provider config lives in `src/app/providers.tsx`; `@import "@daveyplate/better-auth-ui/css"` must stay in `globals.css`.
+- Signup does **not** auto-create a household — `/onboarding` does, and it also picks the timezone.
+
+### Socket.io
+
+- Path `/api/socketio`, `addTrailingSlash: false`. The server instance is stored on `globalThis.socketio` by the API route, so actions call `globalThis.socketio?.to(...)`.
+- Events go to `household:{householdId}` rooms: `chore:done` / `chore:undone` for completions, `household:updated` for every other mutation. `DashboardView` joins the room on mount and calls `router.refresh()` on any event.
+
+### Database and migrations
+
+- Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`. **Never `drizzle-kit push`.**
+- Migrations `0000`–`0004` are applied; production runs them automatically in the `migrate` service before the app starts.
+- `.env` holds `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — there is **no `DATABASE_URL`**. Compose sets `POSTGRES_HOST=db`; local dev defaults to `localhost`. Never shell-interpolate a `DATABASE_URL` — special characters in passwords break it.
+- Postgres 18+ mounts its volume at `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
 
 ## Dev workflow
-- **Dev:** `docker compose -f docker-compose.dev.yml up` — hot reload via compose watch, no rebuild needed for source changes
-- **Migrations (local):** `npx drizzle-kit migrate` (runs against localhost:5432, requires postgres container running with port 5432 exposed)
-- **Prod:** `docker compose up --build -d` — migrations run automatically via the `migrate` service before app starts
-- **Prod secrets:** stored in `secrets/` directory (gitignored): `postgres_password.txt`, `better_auth_secret.txt`, `cloudflare_tunnel_token.txt`
-- **Prod volume:** `docker volume create chore_postgres_data` must exist before first deploy
-- Commit directly to main, no branch/PR workflow
+
+- **Dev (docker):** `docker compose -f docker-compose.dev.yml watch` — compose watch syncs `src/` and `public/`. ⚠️ A _new top-level directory_ under `src/` or `public/` needs a one-time `docker compose -f docker-compose.dev.yml build app` before watch sees it.
+- **Dev (local):** `npm run dev` — needs Postgres reachable on `localhost:5432`.
+- **First time:** `cp .env.example .env` (set `BETTER_AUTH_SECRET`), `docker volume create chore_postgres_data`, start the dev stack, then `npx drizzle-kit migrate`.
+- **Migrations locally:** `npx drizzle-kit migrate`.
+- **Prod:** `git fetch --tags && git checkout <tag> && docker compose up --build -d`. Secrets live in `secrets/` (gitignored): `postgres_password.txt`, `better_auth_secret.txt`, `cloudflare_tunnel_token.txt`. The `chore_postgres_data` volume must exist before the first deploy.
+- Quick container file poke without rebuilding: `docker cp <file> <container>:/app/<path>`.
+
+## Releases
+
+- Version, changelog and tag move together: bump `package.json` (`npm version minor --no-git-tag-version`), move the `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, refresh the compare links, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
+- Annotated tags only. A tag message describes the tagged tree — never reference work that isn't in it.
+- Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
+- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02).
+
+## Testing
+
+- `npm run test:run` — 48 tests in 8 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entry, and table shapes.
+- Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
+- For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
+- If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead.
 
 ## Test data (dev)
 
-Seed rooms and chores:
+- Connect: `docker compose -f docker-compose.dev.yml exec db psql -U chore -d chore`
+- Find your household id: `SELECT id, name, timezone FROM household;`
+- Seed (requires an existing household — create one through `/onboarding`). `sort_order` defaults to `0`; set the household timezone on `/household` or overdue badges will use UTC:
 
 ```sql
-INSERT INTO room (id, name, created_at, updated_at) VALUES
-  ('room-1', 'Kitchen', now(), now()),
-  ('room-2', 'Bathroom', now(), now()),
-  ('room-3', 'Living Room', now(), now());
+INSERT INTO room (id, name, household_id, created_at, updated_at) VALUES
+  ('room-1', 'Kitchen',  '<household-id>', now(), now()),
+  ('room-2', 'Bathroom', '<household-id>', now(), now());
 
 INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated_at) VALUES
-  ('chore-1', 'Wash dishes', 'room-1', 1, true, now() - interval '3 days', now()),
-  ('chore-2', 'Wipe counters', 'room-1', 7, true, now() - interval '10 days', now()),
-  ('chore-3', 'Clean toilet', 'room-2', 7, true, now() - interval '2 days', now()),
-  ('chore-4', 'Scrub shower', 'room-2', 14, true, now() - interval '20 days', now()),
-  ('chore-5', 'Vacuum', 'room-3', 7, true, now(), now()),
-  ('chore-6', 'Dust shelves', 'room-3', 14, true, now() - interval '1 day', now());
+  ('chore-1', 'Wash dishes',  'room-1', 1, true, now() - interval '3 days', now()),
+  ('chore-2', 'Clean toilet', 'room-2', 7, true, now() - interval '2 days', now());
 ```
 
-Reset:
+- Reset: `DELETE FROM completion; DELETE FROM chore; DELETE FROM room;` — or `DELETE FROM household;` to drop everything cascading from it.
 
-```sql
-DELETE FROM completion;
-DELETE FROM chore;
-DELETE FROM room;
-```
+## Known issues
 
-Connect via: `docker compose -f docker-compose.dev.yml exec db psql -U chore -d chore`
+- **A user can belong to several households.** `household_member`'s primary key is `(household_id, user_id)` and `user_id` has a non-unique index, while pages resolve membership with `findFirst({ where: userId })`. With two memberships the app silently renders an arbitrary household. Fix by adding a unique index on `user_id` (new migration) or by supporting an explicit switcher.
 
-## Key conventions
-- `.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — no `DATABASE_URL`
-- Compose sets `POSTGRES_HOST=db`; local dev defaults to `localhost`. Never use shell-interpolated `DATABASE_URL` in compose files
-- Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`
-- Never use `drizzle-kit push` — always generate versioned migration files
-- Socket.io path is `/api/socketio` with `addTrailingSlash: false`
+## Backlog
+
+Unprioritised ideas established after the timezone/household work.
+
+- **History screen** — completions with who/when, rendered in household-local dates. The one unfinished item from the original roadmap.
+- **Reminders / digest** at a household-local time (e.g. 8am local) — the timezone was the missing prerequisite.
+- **Due-date presentation** — "Due Fri, Oct 3" plus dashboard grouping (Overdue / Today / This week), straight from the civil-date helpers.
+- **Richer recurrence** — weekly-on-a-weekday, monthly-on-the-Nth, built on civil-date arithmetic rather than `intervalDays` alone.
+- **More household preferences** on `/household` — week start, 12/24h, date format, default chore interval.
+- **Per-user display timezone** — rendering-only; every date function already takes `timeZone`.
+- **Member management** — list members, remove a member, transfer ownership, regenerate the invite code (`role` is currently write-only).
+- **Switch household in one click** — `/join/[inviteCode]` tells you to leave first; combine leave + join.
+- **CI** — no `.github/` yet; run test/lint/tsc/build on push and build+push the image on tag.
+- **Version visibility** — `ARG APP_VERSION` → `ENV APP_VERSION`, surfaced in the UI or `/api/health`, so "what's deployed" doesn't need a shell.
+- Closed by decision: a "Household" tab inside `AccountView` (the library hardcodes its nav), and per-user timezones for the _math_ (overdueness is shared).
