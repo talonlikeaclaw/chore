@@ -2,6 +2,14 @@
 
 A self-hosted household chore tracker. Chores belong to rooms, have a recurrence interval, and household members mark them done. Overdue chores are highlighted. Real-time updates via Socket.io.
 
+## AI assistance
+
+This project is developed with AI coding agents. Originally
+[Claude Code](https://claude.ai/code), and since then omp agents. Code, tests,
+migrations, and docs are largely agent-written; a human directs the work and
+reviews, commits, tags, and deploys every change. The working conventions used
+by those agents are documented in [AGENTS.md](./AGENTS.md).
+
 ## Stack
 
 Next.js 16 (App Router) · Drizzle ORM + Postgres · Better Auth · Socket.io · ShadCN + Tailwind v4
@@ -29,11 +37,13 @@ INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated
 ## Production (first deploy)
 
 1. Create the persistent volume:
+
    ```bash
    docker volume create chore_postgres_data
    ```
 
 2. Create `secrets/` with three files:
+
    ```
    secrets/postgres_password.txt
    secrets/better_auth_secret.txt
@@ -41,6 +51,7 @@ INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated
    ```
 
 3. Create `.env`:
+
    ```
    POSTGRES_USER=chore
    POSTGRES_DB=chore
@@ -70,7 +81,3 @@ npx drizzle-kit migrate   # requires postgres running on localhost:5432
 ```
 
 Never use `drizzle-kit push` — always generate versioned migration files.
-
----
-
-Built with help from [Claude Code](https://claude.ai/code).
