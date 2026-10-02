@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { householdMembers } from "@/db/schema"
+import { getTimeZoneOptions } from "@/lib/timezone"
 import { OnboardingView } from "./onboarding-view"
 
 export default async function OnboardingPage() {
@@ -18,7 +19,7 @@ export default async function OnboardingPage() {
 
   return (
     <main className="container flex grow flex-col items-center justify-center self-center p-4 md:p-6">
-      <OnboardingView />
+      <OnboardingView timeZoneOptions={getTimeZoneOptions()} />
     </main>
   )
 }

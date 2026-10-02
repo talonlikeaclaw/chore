@@ -29,6 +29,13 @@
       "when": 1780252419116,
       "tag": "0003_same_hedge_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790968610104,
+      "tag": "0004_cold_weapon_omega",
+      "breakpoints": true
     }
   ]
 }

@@ -48,9 +48,11 @@ type DashboardViewProps = {
   inviteCode: string
   householdId: string
   householdName: string
+  timeZone: string
+  now: Date
 }
 
-export function DashboardView({ rooms, inviteCode, householdId, householdName }: DashboardViewProps) {
+export function DashboardView({ rooms, inviteCode, householdId, householdName, timeZone, now }: DashboardViewProps) {
   const router = useRouter()
   const [addingRoom, setAddingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
@@ -178,6 +180,8 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName }:
               optimisticDoneIds={optimisticDoneIds}
               onMarkDone={handleMarkDone}
               isDragActive={room.id === activeId}
+              timeZone={timeZone}
+              now={now}
             />
           ))}
         </SortableContext>

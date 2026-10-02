@@ -5,7 +5,8 @@ import { toast } from "sonner"
 import { Check, Loader2, Pencil, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getDueDate, getOverdueDays } from "@/lib/chores"
+import { getDueDate, getDaysUntilDue, getOverdueDays } from "@/lib/chores"
+import { getDaysAgo } from "@/lib/timezone"
 import { updateChore, deleteChore, undoDeleteChore } from "@/lib/actions"
 
 type ChoreRowProps = {
@@ -21,9 +22,11 @@ type ChoreRowProps = {
   }
   isOptimisticallyDone: boolean
   onMarkDone: (choreId: string) => void
+  timeZone: string
+  now: Date
 }
 
-export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowProps) {
+export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, now }: ChoreRowProps) {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editName, setEditName] = useState(chore.name)
@@ -31,18 +34,16 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone }: ChoreRowPr
   const [isPending, startTransition] = useTransition()
 
   const lastCompletion = chore.completions[0] ?? null
-  const dueDate = getDueDate(chore, lastCompletion)
-  const overdueDays = isOptimisticallyDone ? 0 : getOverdueDays(dueDate)
-  const daysUntilDue = Math.ceil(
-    (dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-  )
+  const dueDate = getDueDate(chore, lastCompletion, timeZone)
+  const daysUntilDue = getDaysUntilDue(dueDate, now, timeZone)
+  const overdueDays = isOptimisticallyDone
+    ? 0
+    : getOverdueDays(dueDate, now, timeZone)
 
   const lastDoneText = (() => {
     if (isOptimisticallyDone) return "Just completed"
     if (!lastCompletion) return null
-    const daysAgo = Math.floor(
-      (Date.now() - lastCompletion.completedAt.getTime()) / (1000 * 60 * 60 * 24)
-    )
+    const daysAgo = getDaysAgo(lastCompletion.completedAt, now, timeZone)
     const when = daysAgo === 0 ? "today" : `${daysAgo}d ago`
     return `Last done by ${lastCompletion.user.name} ${when}`
   })()

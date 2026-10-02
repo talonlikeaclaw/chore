@@ -79,6 +79,7 @@ export const households = pgTable("household", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
+  timezone: text("timezone").notNull().default("UTC"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

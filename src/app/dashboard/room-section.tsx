@@ -36,17 +36,19 @@ type RoomSectionProps = {
   optimisticDoneIds: Set<string>
   onMarkDone: (choreId: string) => void
   isDragActive?: boolean
+  timeZone: string
+  now: Date
 }
 
-function sortByOverdue(chores: Chore[]): Chore[] {
+function sortByOverdue(chores: Chore[], timeZone: string): Chore[] {
   return [...chores].sort((a, b) => {
-    const dueDateA = getDueDate(a, a.completions[0] ?? null)
-    const dueDateB = getDueDate(b, b.completions[0] ?? null)
+    const dueDateA = getDueDate(a, a.completions[0] ?? null, timeZone)
+    const dueDateB = getDueDate(b, b.completions[0] ?? null, timeZone)
     return dueDateA.getTime() - dueDateB.getTime()
   })
 }
 
-export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive }: RoomSectionProps) {
+export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive, timeZone, now }: RoomSectionProps) {
   const [open, setOpen] = useState(true)
   const [editingName, setEditingName] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -70,7 +72,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive 
     transition,
   }
 
-  const sorted = sortByOverdue(room.chores)
+  const sorted = sortByOverdue(room.chores, timeZone)
 
   const handleSaveRoom = () => {
     if (!roomName.trim()) return
@@ -240,6 +242,8 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive 
                 chore={chore}
                 isOptimisticallyDone={optimisticDoneIds.has(chore.id)}
                 onMarkDone={onMarkDone}
+                timeZone={timeZone}
+                now={now}
               />
             ))}
             {addingChore ? (

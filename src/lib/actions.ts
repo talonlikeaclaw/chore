@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { chores, completions, households, householdMembers, rooms } from "@/db/schema"
+import { isValidTimeZone } from "@/lib/timezone"
 
 async function getUserHouseholdId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -20,7 +21,10 @@ async function getUserHouseholdId(): Promise<string> {
 
 // --- Household setup ---
 
-export async function createHousehold(name: string): Promise<void> {
+export async function createHousehold(
+  name: string,
+  timeZone: string
+): Promise<void> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error("Unauthorized")
   const existing = await db.query.householdMembers.findFirst({
@@ -32,6 +36,7 @@ export async function createHousehold(name: string): Promise<void> {
     id: householdId,
     name,
     inviteCode: crypto.randomUUID(),
+    timezone: isValidTimeZone(timeZone) ? timeZone : "UTC",
   })
   await db.insert(householdMembers).values({
     householdId,
@@ -39,6 +44,70 @@ export async function createHousehold(name: string): Promise<void> {
     role: "owner",
   })
   revalidatePath("/dashboard")
+}
+
+export async function updateHouseholdTimezone(timeZone: string): Promise<void> {
+  const householdId = await getUserHouseholdId()
+  if (!isValidTimeZone(timeZone)) throw new Error("Invalid timezone")
+  await db
+    .update(households)
+    .set({ timezone: timeZone })
+    .where(eq(households.id, householdId))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
+}
+
+export async function updateHouseholdName(name: string): Promise<void> {
+  const householdId = await getUserHouseholdId()
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error("Enter a household name")
+  await db
+    .update(households)
+    .set({ name: trimmed })
+    .where(eq(households.id, householdId))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
+}
+
+async function getHouseholdMemberIds(householdId: string): Promise<string[]> {
+  const members = await db
+    .select({ userId: householdMembers.userId })
+    .from(householdMembers)
+    .where(eq(householdMembers.householdId, householdId))
+  return members.map((member) => member.userId)
+}
+
+export async function leaveHousehold(): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) throw new Error("Unauthorized")
+  const membership = await db.query.householdMembers.findFirst({
+    where: eq(householdMembers.userId, session.user.id),
+  })
+  if (!membership) throw new Error("Unauthorized")
+  const members = await getHouseholdMemberIds(membership.householdId)
+  if (members.length <= 1) throw new Error("The last member cannot leave")
+  await db
+    .delete(householdMembers)
+    .where(
+      and(
+        eq(householdMembers.householdId, membership.householdId),
+        eq(householdMembers.userId, session.user.id)
+      )
+    )
+  globalThis.socketio?.to(`household:${membership.householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
+}
+
+export async function deleteHousehold(): Promise<void> {
+  const householdId = await getUserHouseholdId()
+  const members = await getHouseholdMemberIds(householdId)
+  if (members.length > 1) throw new Error("Only a sole member can delete the household")
+  await db.delete(households).where(eq(households.id, householdId))
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
 }
 
 // --- Completions ---

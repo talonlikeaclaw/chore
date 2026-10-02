@@ -1,20 +1,50 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useSyncExternalStore, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { TimeZoneCombobox } from "@/components/timezone-combobox"
 import { createHousehold } from "@/lib/actions"
+import { getBrowserTimeZone, isValidTimeZone, type TimeZoneOption } from "@/lib/timezone"
 
-export function OnboardingView() {
+const subscribeToNothing = () => () => {}
+
+let cachedBrowserZone: string | null = null
+
+// Snapshot cached so the value is referentially stable across renders.
+function getBrowserZoneSnapshot(): string {
+  cachedBrowserZone ??= getBrowserTimeZone()
+  return cachedBrowserZone
+}
+
+// Server snapshot is empty: the first client render must match SSR, and the
+// browser's zone is only known after mount.
+const getServerZoneSnapshot = () => ""
+
+export function OnboardingView({
+  timeZoneOptions,
+}: {
+  timeZoneOptions: TimeZoneOption[]
+}) {
   const router = useRouter()
   const [householdName, setHouseholdName] = useState("")
   const [inviteCode, setInviteCode] = useState("")
+  const [chosenZone, setChosenZone] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const detectedZone = useSyncExternalStore(
+    subscribeToNothing,
+    getBrowserZoneSnapshot,
+    getServerZoneSnapshot
+  )
+  // `null` means untouched, so the detected zone still applies; "" is an
+  // explicit clear.
+  const timeZone = chosenZone ?? detectedZone
+
   const handleCreate = () => {
-    if (!householdName.trim()) return
+    if (!householdName.trim() || !isValidTimeZone(timeZone)) return
     startTransition(async () => {
-      await createHousehold(householdName.trim())
+      await createHousehold(householdName.trim(), timeZone)
       router.push("/dashboard")
     })
   }
@@ -46,10 +76,18 @@ export function OnboardingView() {
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           disabled={isPending}
         />
+        <TimeZoneCombobox
+          id="onboarding-timezone"
+          value={timeZone}
+          onChange={setChosenZone}
+          options={timeZoneOptions}
+          placeholder="Search timezones"
+          disabled={isPending}
+        />
         <Button
           className="w-full"
           onClick={handleCreate}
-          disabled={isPending || !householdName.trim()}
+          disabled={isPending || !householdName.trim() || !isValidTimeZone(timeZone)}
         >
           {isPending ? "Creating…" : "Create household"}
         </Button>

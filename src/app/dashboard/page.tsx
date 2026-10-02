@@ -45,6 +45,8 @@ export default async function DashboardPage() {
       inviteCode={membership.household.inviteCode}
       householdId={membership.householdId}
       householdName={membership.household.name}
+      timeZone={membership.household.timezone}
+      now={new Date()}
     />
   )
 }

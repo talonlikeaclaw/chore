@@ -1,3 +1,5 @@
+import { addCivilDays, civilDaysBetween, toCivilDate } from "./timezone"
+
 export type LastCompletion = {
   completedAt: Date
 }
@@ -8,28 +10,43 @@ export type ChoreBase = {
 }
 
 /**
- * Returns the date a chore is due.
- * If never completed, due date is the chore's creation date.
- * If completed, due date is last completion + intervalDays.
+ * Returns the civil date a chore is due, as a `Date` at UTC midnight whose
+ * Y-M-D is the local due day in `timeZone`.
+ *
+ * Due day = calendar day of (last completion, else chore creation) in
+ * `timeZone`, plus `intervalDays`.
  */
 export function getDueDate(
   chore: ChoreBase,
-  lastCompletion: LastCompletion | null
+  lastCompletion: LastCompletion | null,
+  timeZone: string
 ): Date {
-  if (!lastCompletion) {
-    return chore.createdAt
-  }
-  const due = new Date(lastCompletion.completedAt)
-  due.setDate(due.getDate() + chore.intervalDays)
-  return due
+  const base = lastCompletion
+    ? toCivilDate(lastCompletion.completedAt, timeZone)
+    : toCivilDate(chore.createdAt, timeZone)
+  return addCivilDays(base, chore.intervalDays)
 }
 
 /**
- * Returns how many whole days a chore is past its due date.
- * Returns 0 if not overdue.
+ * Returns whole civil days from today's local date to `dueDate` in `timeZone`.
+ * Negative when overdue, 0 when due today.
  */
-export function getOverdueDays(dueDate: Date): number {
-  const now = new Date()
-  const diffMs = now.getTime() - dueDate.getTime()
-  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+export function getDaysUntilDue(
+  dueDate: Date,
+  now: Date,
+  timeZone: string
+): number {
+  return civilDaysBetween(toCivilDate(now, timeZone), dueDate)
+}
+
+/**
+ * Returns how many civil days `dueDate` is past today's local date in
+ * `timeZone`. Returns 0 if not overdue.
+ */
+export function getOverdueDays(
+  dueDate: Date,
+  now: Date,
+  timeZone: string
+): number {
+  return Math.max(0, -getDaysUntilDue(dueDate, now, timeZone))
 }
