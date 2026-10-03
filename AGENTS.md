@@ -17,7 +17,7 @@ Developed with AI coding agents, directed and reviewed by a human who commits, t
 ## Working style
 
 - One piece at a time: the user reviews between chunks and commits manually to `main`. No branches, no PRs.
-- Before presenting work: `npm run test:run`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. All four are clean today, with one pre-existing exception: eslint reports 2 warnings (`isDragging` unused in `room-section.tsx`, a stale disable in `pages/api/socketio.ts`). These commands are also the CI gates — see **CI**.
+- Before presenting work: `npm run test:run`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. All four are clean. These commands are also the CI gates — see **CI**.
 - Commit messages are plain imperative summaries. Releases are annotated git tags — see **Releases**.
 
 ## Stack
@@ -110,7 +110,7 @@ Breaking one of these regresses something silently.
 
 ## CI
 
-- `.github/workflows/ci.yml` runs on every push to `main`, every `v*` tag and `workflow_dispatch`, on Node 24 (same major as the `Dockerfile`): `npm ci`, `test:run`, `lint`, `tsc --noEmit`, `build`. Warnings pass; the gates must stay at exit 0. No service container — the suite is pure and `next build` needs no database or `.env`.
+- `.github/workflows/ci.yml` runs on every push to `main`, every `v*` tag and `workflow_dispatch`, on `ubuntu-24.04` with Node 24 (same major as the `Dockerfile`): `npm ci`, `test:run`, `lint`, `tsc --noEmit`, `build`. The gates must stay at exit 0. No service container — the suite is pure and `next build` needs no database or `.env`. The runner label is pinned rather than `ubuntu-latest` so the October 2026 Ubuntu 26 migration is opt-in.
 - A `v*` tag additionally builds the `runner` Docker target and pushes `ghcr.io/talonlikeaclaw/chore:<tag>` plus `:latest` with `GITHUB_TOKEN` (`packages: write`), using the Actions build cache. The image is public (public repo).
 - The pushed image bakes `NEXT_PUBLIC_BETTER_AUTH_URL` at build time from the repository variable of the same name; unset falls back to the code's `http://localhost:3000`. `APP_VERSION` is the tag name. Production still builds from source (`docker compose up --build -d`); pulling the image instead is **not** wired up.
 

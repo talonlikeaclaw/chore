@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
+## [0.7.1] - 2026-10-03
+
+### Fixed
+
+- Cleared the two remaining eslint warnings: the unused `isDragging`
+  destructure in `room-section.tsx` and a stale `eslint-disable` directive in
+  `pages/api/socketio.ts`. `npm run lint` is now silent.
+- Pinned the CI runner to `ubuntu-24.04` so the October 2026 `ubuntu-latest`
+  migration to Ubuntu 26 is opt-in.
+
 ## [0.7.0] - 2026-10-03
 
 ### Added
@@ -169,7 +179,8 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
-[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/talonlikeaclaw/chore/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/talonlikeaclaw/chore/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/talonlikeaclaw/chore/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/talonlikeaclaw/chore/compare/v0.4.0...v0.5.0

@@ -16,7 +16,6 @@ interface NextApiResponseWithSocket extends NextApiResponse {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var socketio: SocketIOServer | undefined;
 }
 

@@ -56,7 +56,6 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
     setNodeRef,
     transform,
     transition,
-    isDragging,
   } = useSortable({ id: room.id })
 
   const style = {
