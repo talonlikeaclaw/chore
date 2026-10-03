@@ -17,7 +17,7 @@ Developed with AI coding agents, directed and reviewed by a human who commits, t
 ## Working style
 
 - One piece at a time: the user reviews between chunks and commits manually to `main`. No branches, no PRs.
-- Before presenting work: `npm run test:run`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. All four are clean today, with three pre-existing exceptions: eslint reports 2 warnings (`isDragging` unused in `room-section.tsx`, a stale disable in `pages/api/socketio.ts`) and `tsc` flags the 3 test files that use vitest globals without importing them.
+- Before presenting work: `npm run test:run`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. All four are clean today, with one pre-existing exception: eslint reports 2 warnings (`isDragging` unused in `room-section.tsx`, a stale disable in `pages/api/socketio.ts`). These commands are also the CI gates — see **CI**.
 - Commit messages are plain imperative summaries. Releases are annotated git tags — see **Releases**.
 
 ## Stack
@@ -108,6 +108,12 @@ Breaking one of these regresses something silently.
 - Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
 - Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03), `v0.6.0` (household preferences, version visibility, 2026-10-03).
 
+## CI
+
+- `.github/workflows/ci.yml` runs on every push to `main`, every `v*` tag and `workflow_dispatch`, on Node 24 (same major as the `Dockerfile`): `npm ci`, `test:run`, `lint`, `tsc --noEmit`, `build`. Warnings pass; the gates must stay at exit 0. No service container — the suite is pure and `next build` needs no database or `.env`.
+- A `v*` tag additionally builds the `runner` Docker target and pushes `ghcr.io/talonlikeaclaw/chore:<tag>` plus `:latest` with `GITHUB_TOKEN` (`packages: write`), using the Actions build cache. The image is public (public repo).
+- The pushed image bakes `NEXT_PUBLIC_BETTER_AUTH_URL` at build time from the repository variable of the same name; unset falls back to the code's `http://localhost:3000`. `APP_VERSION` is the tag name. Production still builds from source (`docker compose up --build -d`); pulling the image instead is **not** wired up.
+
 ## Testing
 
 - `npm run test:run` — 98 tests in 12 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), household preference validation, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
@@ -141,5 +147,4 @@ Unprioritised ideas established after the timezone/household work.
 
 - **Reminders / digest** at a household-local time (e.g. 8am local) — the timezone was the missing prerequisite.
 - **Per-user display timezone** — rendering-only; every date function already takes `timeZone`.
-- **CI** — no `.github/` yet; run test/lint/tsc/build on push and build+push the image on tag.
 - Closed by decision: a "Household" tab inside `AccountView` (the library hardcodes its nav), and per-user timezones for the _math_ (overdueness is shared).

@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest"
 import { authViewPaths } from "@daveyplate/better-auth-ui/server"
 import { generateStaticParams } from "@/app/auth/[path]/page"
 
