@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
+## [0.7.3] - 2026-10-03
+
+### Changed
+
+- The chore row is three tiers: title (the chore name, then the room chip on the
+  `Due soon` panel), then the cadence with `Last done by …`, then the due/overdue
+  badge on its own bottom line. The badge no longer shares a wrapping line with
+  the chore name, so the cadence and last-done stop shifting when a badge
+  changes width, and the row has room for both at every breakpoint.
+
+### Fixed
+
+- `/dashboard` no longer lets its last element (`Add room`, or the add-room
+  input) touch the version footer. The dashboard layout's
+  `pb-[env(safe-area-inset-bottom)]` replaced `py-6`'s bottom padding with the
+  home-indicator inset — `0` on desktop — so the page had no bottom padding at
+  all; the inset is now added on top of it.
+
 ## [0.7.2] - 2026-10-03
 
 ### Changed
@@ -192,6 +210,7 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
+[0.7.3]: https://github.com/talonlikeaclaw/chore/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/talonlikeaclaw/chore/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/talonlikeaclaw/chore/compare/v0.6.0...v0.7.0

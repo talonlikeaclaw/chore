@@ -164,14 +164,25 @@ export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, ti
     <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium">{chore.name}</span>
           {roomName && (
             <Badge variant="outline" className="bg-muted/50">
               {roomName}
             </Badge>
           )}
-          <span className="font-medium">{chore.name}</span>
-          {!isOptimisticallyDone &&
-            (overdueDays > 0 ? (
+        </span>
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+          <span>{describeRecurrence(chore)}</span>
+          {lastDoneText && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{lastDoneText}</span>
+            </>
+          )}
+        </span>
+        {!isOptimisticallyDone && (
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            {overdueDays > 0 ? (
               <Badge variant="destructive">
                 Overdue · {formatDueDate(dueDate, now, timeZone, dateFormat)}
               </Badge>
@@ -183,17 +194,9 @@ export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, ti
               <Badge variant="secondary">
                 Due {formatDueDate(dueDate, now, timeZone, dateFormat)}
               </Badge>
-            ))}
-        </span>
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-          <span>{describeRecurrence(chore)}</span>
-          {lastDoneText && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>{lastDoneText}</span>
-            </>
-          )}
-        </span>
+            )}
+          </span>
+        )}
       </div>
       <div className="flex w-full items-center gap-1 sm:w-auto sm:shrink-0">
         <Button
