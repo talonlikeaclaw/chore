@@ -31,9 +31,9 @@ Developed with AI coding agents, directed and reviewed by a human who commits, t
 
 ## Layout
 
-- Routes: `/` welcome · `/dashboard` · `/onboarding` · `/join/[inviteCode]` · `/household` · `/account/[[...settings]]` · `/auth/[path]` · `/api/auth/[...all]` · `/api/socketio` (Pages Router)
+- Routes: `/` welcome · `/dashboard` · `/history` · `/onboarding` · `/join/[inviteCode]` · `/household` · `/account/[[...settings]]` · `/auth/[path]` · `/api/auth/[...all]` · `/api/socketio` (Pages Router)
 - `src/lib/actions.ts` — all 16 Server Actions; every one is scoped by `getUserHouseholdId()`
-- `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — due/overdue · `src/lib/socket.ts` — client singleton
+- `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — due/overdue · `src/lib/history.ts` — history stats/log (pure, takes `now`/`timeZone`) · `src/lib/socket.ts` — client singleton
 - `src/db/schema.ts` — single source of schema truth · `src/db/index.ts` — `db` singleton (globalThis, for dev HMR)
 - `src/components/ui/*` — Base UI wrappers · `src/components/timezone-combobox.tsx` — the zone picker
 
@@ -48,6 +48,7 @@ Breaking one of these regresses something silently.
 - Due/overdue are calendar days, so `getDueDate`/`getDaysUntilDue`/`getOverdueDays` all take `timeZone`; they flip at the household's local midnight.
 - Components receive `timeZone` and `now` as props from the server render. **No `new Date()` / `Date.now()` anywhere in a render path** — that is what keeps SSR and hydration byte-identical.
 - Timezone options come from `getTimeZoneOptions()` on the server (hydration-stable, and offsets are resolved with full ICU); the browser's `Intl.supportedValuesOf` is deliberately not used. Node 24 slim ships full ICU.
+- `/history` stats are all-time and live in `src/lib/history.ts` (pure: `now` and `timeZone` are arguments); only the log is capped, at the most recent 100 completions. Weeks are Monday-start — there is no week-start preference yet.
 
 ### Household authority
 
@@ -63,7 +64,8 @@ Breaking one of these regresses something silently.
 
 ### Better Auth UI
 
-- The household entry lives in the `UserButton` menu via `additionalLinks` (`nav-bar.tsx`), and the library's own entry is relabelled `SETTINGS: "Account"` so the menu never shows two "Settings".
+- The household entry lives in the `UserButton` menu via `additionalLinks` (`nav-bar.tsx`), and the library's own entry is relabelled `SETTINGS: "Account"` so the menu never shows two "Settings". History is a header button beside the account button instead — a `Link` styled with `buttonVariants()`, since this repo's `Button` is Base UI and has no `asChild`.
+- `/household` and `/history` are reached from `/dashboard`; `/history` carries the same back link, and `NavBar` only wraps the `/dashboard` subtree.
 - `AccountView`'s sidebar builds `navItems` from a hardcoded array in the library — a "Household" tab cannot be added there. That is why `/household` is its own page.
 - Provider config lives in `src/app/providers.tsx`; `@import "@daveyplate/better-auth-ui/css"` must stay in `globals.css`.
 - Signup does **not** auto-create a household — `/onboarding` does, and it also picks the timezone.
@@ -71,7 +73,7 @@ Breaking one of these regresses something silently.
 ### Socket.io
 
 - Path `/api/socketio`, `addTrailingSlash: false`. The server instance is stored on `globalThis.socketio` by the API route, so actions call `globalThis.socketio?.to(...)`.
-- Events go to `household:{householdId}` rooms: `chore:done` / `chore:undone` for completions, `household:updated` for every other mutation. `DashboardView` joins the room on mount and calls `router.refresh()` on any event.
+- Events go to `household:{householdId}` rooms: `chore:done` / `chore:undone` for completions, `household:updated` for every other mutation. `DashboardView` and `HistoryView` join the room on mount and call `router.refresh()` on any event.
 
 ### Database and migrations
 
@@ -82,7 +84,7 @@ Breaking one of these regresses something silently.
 
 ## Dev workflow
 
-- **Dev (docker):** `docker compose -f docker-compose.dev.yml watch` — compose watch syncs `src/` and `public/`. ⚠️ A _new top-level directory_ under `src/` or `public/` needs a one-time `docker compose -f docker-compose.dev.yml build app` before watch sees it.
+- **Dev (docker):** `docker compose -f docker-compose.dev.yml watch` — compose watch syncs `src/` and `public/`. ⚠️ A _new top-level directory_ under `src/` or `public/` needs a one-time `docker compose -f docker-compose.dev.yml build app` before watch sees it. Edits to existing files occasionally sync without invalidating the dev server's module cache — `docker restart chore-app-1` if the browser or `curl` still shows the old markup.
 - **Dev (local):** `npm run dev` — needs Postgres reachable on `localhost:5432`.
 - **First time:** `cp .env.example .env` (set `BETTER_AUTH_SECRET`), `docker volume create chore_postgres_data`, start the dev stack, then `npx drizzle-kit migrate`.
 - **Migrations locally:** `npx drizzle-kit migrate`.
@@ -94,11 +96,11 @@ Breaking one of these regresses something silently.
 - Version, changelog and tag move together: bump `package.json` (`npm version minor --no-git-tag-version`), move the `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, refresh the compare links, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
 - Annotated tags only. A tag message describes the tagged tree — never reference work that isn't in it.
 - Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
-- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02).
+- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02).
 
 ## Testing
 
-- `npm run test:run` — 48 tests in 8 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entry, and table shapes.
+- `npm run test:run` — 56 tests in 9 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, and table shapes.
 - Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
 - For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
 - If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead.
@@ -129,7 +131,6 @@ INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated
 
 Unprioritised ideas established after the timezone/household work.
 
-- **History screen** — completions with who/when, rendered in household-local dates. The one unfinished item from the original roadmap.
 - **Reminders / digest** at a household-local time (e.g. 8am local) — the timezone was the missing prerequisite.
 - **Due-date presentation** — "Due Fri, Oct 3" plus dashboard grouping (Overdue / Today / This week), straight from the civil-date helpers.
 - **Richer recurrence** — weekly-on-a-weekday, monthly-on-the-Nth, built on civil-date arithmetic rather than `intervalDays` alone.

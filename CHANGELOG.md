@@ -9,6 +9,17 @@ those are called out under **Changed**.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-02
+
+### Added
+
+- `/history` page: lifetime / 7-day / 30-day completion totals, per-member and
+  per-room counts, actual-vs-target cadence per chore, an 8-week trend, and the
+  most recent 100 completions grouped by household-local day. Statistics are
+  computed in `src/lib/history.ts`; the page is read-only and refreshes over
+  Socket.io like the dashboard.
+- History button in the dashboard header, next to the account button.
+
 ## [0.2.0] - 2026-10-02
 
 ### Added
@@ -53,6 +64,7 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
-[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/talonlikeaclaw/chore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/talonlikeaclaw/chore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/talonlikeaclaw/chore/releases/tag/v0.1.0

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { AuthUIProvider } from "@daveyplate/better-auth-ui"
 import type { AuthUIProviderProps } from "@daveyplate/better-auth-ui"
@@ -68,5 +68,32 @@ describe("NavBar", () => {
     const account = screen.getByText("Account")
     expect(account.closest("a")?.getAttribute("href")).toContain("/account")
     expect(screen.queryByText("Settings")).toBeNull()
+  })
+
+  it("links to history from the header, not the user menu", async () => {
+    const { container } = render(
+      <AuthUIProvider
+        authClient={authClient}
+        navigate={() => {}}
+        replace={() => {}}
+        Link={Link}
+        hooks={signedInHooks}
+      >
+        <NavBar />
+      </AuthUIProvider>
+    )
+
+    const history = screen.getByRole("link", { name: "History" })
+    expect(history.getAttribute("href")).toBe("/history")
+    expect(history.querySelector("svg")).not.toBeNull()
+    expect(container.querySelector("header")?.contains(history)).toBe(true)
+
+    const trigger = container.querySelector("button")
+    fireEvent.pointerDown(trigger!)
+
+    await screen.findByText("Household")
+    const menu = document.querySelector('[role="menu"]')
+    expect(menu).not.toBeNull()
+    expect(within(menu as HTMLElement).queryByText("History")).toBeNull()
   })
 })
