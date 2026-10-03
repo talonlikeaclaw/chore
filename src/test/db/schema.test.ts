@@ -1,6 +1,17 @@
 import { getTableColumns } from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { chores, completions, rooms } from "@/db/schema";
+import { chores, completions, householdMembers, rooms } from "@/db/schema";
+
+describe("household_member table", () => {
+  it("makes user_id unique so a user belongs to one household", () => {
+    const { indexes } = getTableConfig(householdMembers);
+    const idx = indexes.find(
+      (i) => i.config.name === "household_member_userId_idx"
+    );
+    expect(idx?.config.unique).toBe(true);
+  });
+});
 
 describe("rooms table", () => {
   it("has expected columns", () => {

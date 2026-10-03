@@ -9,6 +9,27 @@ those are called out under **Changed**.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-02
+
+### Added
+
+- Member management on `/household`: a member list with roles, transfer
+  ownership, remove a member, and regenerate the invite code (all owner-only
+  except the list).
+- One-click household switch from `/join/[inviteCode]`: switching from a solo
+  household deletes it (cascading its rooms and chores), otherwise it leaves the
+  current household — then joins the target.
+
+### Changed
+
+- A user now belongs to exactly one household: `household_member.user_id` is
+  UNIQUE (migration `0005_last_glorian.sql`, which dedupes any existing
+  duplicates and promotes an owner where one was missing). Previously a user
+  with two memberships rendered an arbitrary household.
+- `leaveHousehold` auto-transfers ownership to the longest-standing remaining
+  member when the owner leaves; `deleteHousehold` is owner-only and requires
+  typing the household name to confirm.
+
 ## [0.3.0] - 2026-10-02
 
 ### Added
@@ -64,7 +85,8 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
-[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/talonlikeaclaw/chore/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/talonlikeaclaw/chore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/talonlikeaclaw/chore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/talonlikeaclaw/chore/releases/tag/v0.1.0

@@ -36,6 +36,13 @@
       "when": 1790968610104,
       "tag": "0004_cold_weapon_omega",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790994611749,
+      "tag": "0005_last_glorian",
+      "breakpoints": true
     }
   ]
 }

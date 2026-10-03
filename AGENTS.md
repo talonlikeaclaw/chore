@@ -32,7 +32,7 @@ Developed with AI coding agents, directed and reviewed by a human who commits, t
 ## Layout
 
 - Routes: `/` welcome · `/dashboard` · `/history` · `/onboarding` · `/join/[inviteCode]` · `/household` · `/account/[[...settings]]` · `/auth/[path]` · `/api/auth/[...all]` · `/api/socketio` (Pages Router)
-- `src/lib/actions.ts` — all 16 Server Actions; every one is scoped by `getUserHouseholdId()`
+- `src/lib/actions.ts` — all 20 Server Actions; membership resolves through `getUserMembership()`, and owner-only actions are gated by `requireOwner()`
 - `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — due/overdue · `src/lib/history.ts` — history stats/log (pure, takes `now`/`timeZone`) · `src/lib/socket.ts` — client singleton
 - `src/db/schema.ts` — single source of schema truth · `src/db/index.ts` — `db` singleton (globalThis, for dev HMR)
 - `src/components/ui/*` — Base UI wrappers · `src/components/timezone-combobox.tsx` — the zone picker
@@ -52,9 +52,10 @@ Breaking one of these regresses something silently.
 
 ### Household authority
 
-- Actions resolve the caller's household through `getUserHouseholdId()` and scope every query to it; nothing crosses household boundaries.
-- `leaveHousehold` refuses when the caller is the last member; `deleteHousehold` is allowed only for a sole member and cascades rooms → chores → completions.
-- `role` (`owner`/`member`) is written at join time and **never read** — no ownership semantics exist yet.
+- Actions resolve the caller's household through `getUserMembership()` / `getUserHouseholdId()` and scope every query to it; nothing crosses household boundaries.
+- A user belongs to exactly one household: `household_member.user_id` has a UNIQUE index, and pages resolve membership with `findFirst({ where: userId })`.
+- `role` is authoritative. `requireOwner()` gates `deleteHousehold`, `removeMember`, `transferOwnership` and `regenerateInviteCode`. `leaveHousehold` refuses for the last member; an owner leaving a non-empty household auto-transfers ownership to the longest-standing remaining member. `deleteHousehold` requires the typed household name and cascades rooms → chores → completions. The `/join/[inviteCode]` "switch" path deletes a solo household or leaves a shared one, then joins the target.
+- Removing a member only deletes their `household_member` row (`chores.assignedUserId` is never set, so no chore reassignment is needed).
 
 ### Rendering and client boundaries
 
@@ -100,7 +101,7 @@ Breaking one of these regresses something silently.
 
 ## Testing
 
-- `npm run test:run` — 56 tests in 9 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, and table shapes.
+- `npm run test:run` — 65 tests in 11 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
 - Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
 - For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
 - If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead.
@@ -123,10 +124,6 @@ INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated
 
 - Reset: `DELETE FROM completion; DELETE FROM chore; DELETE FROM room;` — or `DELETE FROM household;` to drop everything cascading from it.
 
-## Known issues
-
-- **A user can belong to several households.** `household_member`'s primary key is `(household_id, user_id)` and `user_id` has a non-unique index, while pages resolve membership with `findFirst({ where: userId })`. With two memberships the app silently renders an arbitrary household. Fix by adding a unique index on `user_id` (new migration) or by supporting an explicit switcher.
-
 ## Backlog
 
 Unprioritised ideas established after the timezone/household work.
@@ -136,8 +133,6 @@ Unprioritised ideas established after the timezone/household work.
 - **Richer recurrence** — weekly-on-a-weekday, monthly-on-the-Nth, built on civil-date arithmetic rather than `intervalDays` alone.
 - **More household preferences** on `/household` — week start, 12/24h, date format, default chore interval.
 - **Per-user display timezone** — rendering-only; every date function already takes `timeZone`.
-- **Member management** — list members, remove a member, transfer ownership, regenerate the invite code (`role` is currently write-only).
-- **Switch household in one click** — `/join/[inviteCode]` tells you to leave first; combine leave + join.
 - **CI** — no `.github/` yet; run test/lint/tsc/build on push and build+push the image on tag.
 - **Version visibility** — `ARG APP_VERSION` → `ENV APP_VERSION`, surfaced in the UI or `/api/health`, so "what's deployed" doesn't need a shell.
 - Closed by decision: a "Household" tab inside `AccountView` (the library hardcodes its nav), and per-user timezones for the _math_ (overdueness is shared).

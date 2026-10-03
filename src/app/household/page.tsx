@@ -2,11 +2,11 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
-import { eq } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
-import { householdMembers } from "@/db/schema"
+import { householdMembers, user } from "@/db/schema"
 import { getTimeZoneOptions } from "@/lib/timezone"
 import { HouseholdSettings } from "./household-settings"
 
@@ -22,9 +22,16 @@ export default async function HouseholdPage() {
   if (!membership) redirect("/onboarding")
 
   const members = await db
-    .select({ userId: householdMembers.userId })
+    .select({
+      userId: householdMembers.userId,
+      name: user.name,
+      email: user.email,
+      role: householdMembers.role,
+    })
     .from(householdMembers)
+    .innerJoin(user, eq(householdMembers.userId, user.id))
     .where(eq(householdMembers.householdId, membership.householdId))
+    .orderBy(asc(householdMembers.joinedAt))
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-6">
@@ -38,8 +45,11 @@ export default async function HouseholdPage() {
       <HouseholdSettings
         name={membership.household.name}
         timeZone={membership.household.timezone}
-        memberCount={members.length}
         timeZoneOptions={getTimeZoneOptions()}
+        inviteCode={membership.household.inviteCode}
+        members={members}
+        currentUserId={session.user.id}
+        isOwner={membership.role === "owner"}
       />
     </main>
   )

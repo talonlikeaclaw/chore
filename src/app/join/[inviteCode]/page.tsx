@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { households, householdMembers } from "@/db/schema"
+import { JoinSwitch } from "./join-switch"
 
 export default async function JoinPage({
   params,
@@ -42,15 +43,18 @@ export default async function JoinPage({
     if (existingMembership.householdId === household.id) {
       redirect("/dashboard")
     }
+    const currentMembers = await db
+      .select({ userId: householdMembers.userId })
+      .from(householdMembers)
+      .where(eq(householdMembers.householdId, existingMembership.householdId))
+
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-2xl font-bold">Already in a household</h1>
-        <p className="text-muted-foreground">
-          You&apos;re already a member of{" "}
-          <strong>{existingMembership.household.name}</strong>. Leave that
-          household first before joining a new one.
-        </p>
-      </main>
+      <JoinSwitch
+        inviteCode={household.inviteCode}
+        currentName={existingMembership.household.name}
+        targetName={household.name}
+        isSoleMember={currentMembers.length <= 1}
+      />
     )
   }
 

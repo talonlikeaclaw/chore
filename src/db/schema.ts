@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, uniqueIndex, integer, primaryKey } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -101,7 +101,7 @@ export const householdMembers = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.householdId, table.userId] }),
-    index("household_member_userId_idx").on(table.userId),
+    uniqueIndex("household_member_userId_idx").on(table.userId),
   ]
 );
 

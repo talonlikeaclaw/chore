@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, sql } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 
@@ -9,14 +9,66 @@ import { db } from "@/db"
 import { chores, completions, households, householdMembers, rooms } from "@/db/schema"
 import { isValidTimeZone } from "@/lib/timezone"
 
-async function getUserHouseholdId(): Promise<string> {
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function getUserMembership(): Promise<{
+  householdId: string
+  userId: string
+  role: "owner" | "member"
+}> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error("Unauthorized")
   const membership = await db.query.householdMembers.findFirst({
     where: eq(householdMembers.userId, session.user.id),
   })
   if (!membership) throw new Error("Unauthorized")
-  return membership.householdId
+  return { householdId: membership.householdId, userId: session.user.id, role: membership.role }
+}
+
+async function requireOwner(): Promise<{ householdId: string; userId: string }> {
+  const membership = await getUserMembership()
+  if (membership.role !== "owner") throw new Error("Only the owner can do that")
+  return membership
+}
+
+async function getUserHouseholdId(): Promise<string> {
+  return (await getUserMembership()).householdId
+}
+
+async function detachMember(
+  tx: DbTransaction,
+  membership: { householdId: string; userId: string; role: "owner" | "member" },
+  options: { deleteIfSole: boolean }
+): Promise<void> {
+  const members = await tx.query.householdMembers.findMany({
+    where: eq(householdMembers.householdId, membership.householdId),
+    orderBy: [asc(householdMembers.joinedAt)],
+  })
+  if (members.length <= 1) {
+    if (!options.deleteIfSole) throw new Error("The last member cannot leave")
+    await tx.delete(households).where(eq(households.id, membership.householdId))
+    return
+  }
+  await tx
+    .delete(householdMembers)
+    .where(
+      and(
+        eq(householdMembers.householdId, membership.householdId),
+        eq(householdMembers.userId, membership.userId)
+      )
+    )
+  if (membership.role === "owner") {
+    const successor = members.find((m) => m.userId !== membership.userId)!
+    await tx
+      .update(householdMembers)
+      .set({ role: "owner" })
+      .where(
+        and(
+          eq(householdMembers.householdId, membership.householdId),
+          eq(householdMembers.userId, successor.userId)
+        )
+      )
+  }
 }
 
 // --- Household setup ---
@@ -71,43 +123,111 @@ export async function updateHouseholdName(name: string): Promise<void> {
   revalidatePath("/household")
 }
 
-async function getHouseholdMemberIds(householdId: string): Promise<string[]> {
-  const members = await db
-    .select({ userId: householdMembers.userId })
-    .from(householdMembers)
-    .where(eq(householdMembers.householdId, householdId))
-  return members.map((member) => member.userId)
-}
-
 export async function leaveHousehold(): Promise<void> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) throw new Error("Unauthorized")
-  const membership = await db.query.householdMembers.findFirst({
-    where: eq(householdMembers.userId, session.user.id),
+  const membership = await getUserMembership()
+  await db.transaction(async (tx) => {
+    await detachMember(tx, membership, { deleteIfSole: false })
   })
-  if (!membership) throw new Error("Unauthorized")
-  const members = await getHouseholdMemberIds(membership.householdId)
-  if (members.length <= 1) throw new Error("The last member cannot leave")
-  await db
-    .delete(householdMembers)
-    .where(
-      and(
-        eq(householdMembers.householdId, membership.householdId),
-        eq(householdMembers.userId, session.user.id)
-      )
-    )
   globalThis.socketio?.to(`household:${membership.householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
   revalidatePath("/household")
+  revalidatePath("/history")
 }
 
-export async function deleteHousehold(): Promise<void> {
-  const householdId = await getUserHouseholdId()
-  const members = await getHouseholdMemberIds(householdId)
-  if (members.length > 1) throw new Error("Only a sole member can delete the household")
+export async function deleteHousehold(confirmName: string): Promise<void> {
+  const { householdId } = await requireOwner()
+  const household = await db.query.households.findFirst({
+    where: eq(households.id, householdId),
+  })
+  if (!household) throw new Error("Household not found")
+  if (confirmName.trim() !== household.name) throw new Error("Household name does not match")
   await db.delete(households).where(eq(households.id, householdId))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
   revalidatePath("/household")
+  revalidatePath("/history")
+}
+
+export async function removeMember(userId: string): Promise<void> {
+  const { householdId, userId: callerId } = await requireOwner()
+  if (userId === callerId) throw new Error("Use leave to remove yourself")
+  const target = await db.query.householdMembers.findFirst({
+    where: and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)),
+  })
+  if (!target) throw new Error("Member not found")
+  if (target.role === "owner") throw new Error("Cannot remove the owner")
+  await db
+    .delete(householdMembers)
+    .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/household")
+  revalidatePath("/history")
+}
+
+export async function transferOwnership(userId: string): Promise<void> {
+  const { householdId, userId: callerId } = await requireOwner()
+  if (userId === callerId) throw new Error("You are already the owner")
+  const target = await db.query.householdMembers.findFirst({
+    where: and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)),
+  })
+  if (!target) throw new Error("Member not found")
+  await db.transaction(async (tx) => {
+    await tx
+      .update(householdMembers)
+      .set({ role: "member" })
+      .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, callerId)))
+    await tx
+      .update(householdMembers)
+      .set({ role: "owner" })
+      .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
+  })
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/household")
+}
+
+export async function regenerateInviteCode(): Promise<string> {
+  const { householdId } = await requireOwner()
+  const inviteCode = crypto.randomUUID()
+  await db.update(households).set({ inviteCode }).where(eq(households.id, householdId))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
+  return inviteCode
+}
+
+export async function switchHousehold(inviteCode: string): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) throw new Error("Unauthorized")
+  const target = await db.query.households.findFirst({
+    where: eq(households.inviteCode, inviteCode),
+  })
+  if (!target) throw new Error("Invalid invite code")
+  const current = await db.query.householdMembers.findFirst({
+    where: eq(householdMembers.userId, session.user.id),
+  })
+  if (current?.householdId === target.id) return
+  const oldHouseholdId = current?.householdId ?? null
+  await db.transaction(async (tx) => {
+    if (current) {
+      await detachMember(
+        tx,
+        { householdId: current.householdId, userId: session.user.id, role: current.role },
+        { deleteIfSole: true }
+      )
+    }
+    await tx.insert(householdMembers).values({
+      householdId: target.id,
+      userId: session.user.id,
+      role: "member",
+    })
+  })
+  if (oldHouseholdId) {
+    globalThis.socketio?.to(`household:${oldHouseholdId}`).emit("household:updated")
+  }
+  globalThis.socketio?.to(`household:${target.id}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/household")
+  revalidatePath("/history")
 }
 
 // --- Completions ---
