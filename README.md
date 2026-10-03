@@ -68,9 +68,15 @@ Migrations run automatically before the app starts. Cloudflare Tunnel handles pu
 
 ## Subsequent deploys
 
+Deploy a tagged release:
+
 ```bash
-git pull && docker compose up --build -d
+git fetch --tags
+git checkout <tag>          # e.g. v0.6.0
+APP_VERSION=$(git describe --tags) docker compose up --build -d
 ```
+
+`APP_VERSION` is baked into the image and shown in the footer and at `/api/health`.
 
 ## Schema changes
 

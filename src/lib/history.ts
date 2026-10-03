@@ -5,6 +5,7 @@ import {
   toCivilDate,
 } from "./timezone"
 import { getTargetDays, type Recurrence } from "./chores"
+import type { DateFormat, HourCycle } from "./preferences"
 
 export type CompletionEntry = {
   id: string
@@ -226,28 +227,38 @@ export type WeekBucket = {
   ratio: number
 }
 
-/** Monday-start week of a civil date. */
-function getWeekStart(civilDate: Date): Date {
-  return addCivilDays(civilDate, -((civilDate.getUTCDay() + 6) % 7))
+/** The week start day of a civil date. `weekStartsOn` is 0 = Sunday … 6 = Saturday. */
+function getWeekStart(civilDate: Date, weekStartsOn: number): Date {
+  return addCivilDays(civilDate, -((civilDate.getUTCDay() - weekStartsOn + 7) % 7))
 }
 
-const weekLabelFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-})
+// dmy uses `en-AU` for a consistent comma ("29 Dec", "Sat, 10 Jan"); `en-GB`
+// omits it unless a year is present. See `chores.ts`.
+const weekLabelFormatters: Record<DateFormat, Intl.DateTimeFormat> = {
+  mdy: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+  dmy: new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", timeZone: "UTC" }),
+}
+
+export type WeeklyTrendOptions = {
+  weekStartsOn?: number
+  dateFormat?: DateFormat
+  weeks?: number
+}
 
 /**
- * Completion counts for the last `weeks` Monday-start weeks, oldest first,
- * ending with the week containing `now`.
+ * Completion counts for the last `weeks` weeks, oldest first, ending with the
+ * week containing `now`. Weeks start on `weekStartsOn` (default Monday).
  */
 export function getWeeklyTrend(
   entries: CompletionEntry[],
   now: Date,
   timeZone: string,
-  weeks = 8
+  options: WeeklyTrendOptions = {}
 ): WeekBucket[] {
-  const currentWeekStart = getWeekStart(toCivilDate(now, timeZone))
+  const weekStartsOn = options.weekStartsOn ?? 1
+  const dateFormat = options.dateFormat ?? "mdy"
+  const weeks = options.weeks ?? 8
+  const currentWeekStart = getWeekStart(toCivilDate(now, timeZone), weekStartsOn)
   const starts: Date[] = []
   for (let i = weeks - 1; i >= 0; i -= 1) {
     starts.push(addCivilDays(currentWeekStart, -7 * i))
@@ -257,7 +268,7 @@ export function getWeeklyTrend(
   const indexByStart = new Map(starts.map((start, index) => [start.getTime(), index]))
 
   for (const entry of entries) {
-    const weekStart = getWeekStart(toCivilDate(entry.completedAt, timeZone))
+    const weekStart = getWeekStart(toCivilDate(entry.completedAt, timeZone), weekStartsOn)
     const index = indexByStart.get(weekStart.getTime())
     if (index !== undefined) counts[index] += 1
   }
@@ -267,7 +278,7 @@ export function getWeeklyTrend(
 
   return starts.map((start, index) => ({
     start,
-    label: index === lastIndex ? "This week" : weekLabelFormatter.format(start),
+    label: index === lastIndex ? "This week" : weekLabelFormatters[dateFormat].format(start),
     count: counts[index],
     ratio: counts[index] / Math.max(1, maxCount),
   }))
@@ -283,12 +294,21 @@ export type LogEntry = {
 
 export type LogGroup = { key: string; label: string; entries: LogEntry[] }
 
-const logDayFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-})
+const logDayFormatters: Record<DateFormat, Intl.DateTimeFormat> = {
+  mdy: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }),
+  dmy: new Intl.DateTimeFormat("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }),
+}
+
+const logDayWithYearFormatters: Record<DateFormat, Intl.DateTimeFormat> = {
+  mdy: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
+  dmy: new Intl.DateTimeFormat("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }),
+}
+
+export type HistoryLogOptions = {
+  hourCycle?: HourCycle
+  dateFormat?: DateFormat
+  limit?: number
+}
 
 /**
  * Groups the most recent completions (expected newest first) into
@@ -298,14 +318,17 @@ export function getHistoryLog(
   entries: CompletionEntry[],
   now: Date,
   timeZone: string,
-  limit = 100
+  options: HistoryLogOptions = {}
 ): { groups: LogGroup[]; truncated: boolean; total: number } {
+  const hourCycle = options.hourCycle ?? "h23"
+  const dateFormat = options.dateFormat ?? "mdy"
+  const limit = options.limit ?? 100
   const total = entries.length
   const currentYear = toCivilDate(now, timeZone).getUTCFullYear()
   const timeFormatter = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
+    hour: hourCycle === "h12" ? "numeric" : "2-digit",
     minute: "2-digit",
-    hourCycle: "h23",
+    hourCycle,
     timeZone,
   })
 
@@ -325,10 +348,9 @@ export function getHistoryLog(
       } else if (daysAgo === 1) {
         label = "Yesterday"
       } else {
-        label = logDayFormatter.format(civilDate)
-        if (civilDate.getUTCFullYear() !== currentYear) {
-          label += `, ${civilDate.getUTCFullYear()}`
-        }
+        label = civilDate.getUTCFullYear() === currentYear
+          ? logDayFormatters[dateFormat].format(civilDate)
+          : logDayWithYearFormatters[dateFormat].format(civilDate)
       }
 
       group = { key, label, entries: [] }

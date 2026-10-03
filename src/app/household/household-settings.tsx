@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Check, Pencil, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { TimeZoneCombobox } from "@/components/timezone-combobox"
 import {
@@ -14,9 +15,21 @@ import {
   removeMember,
   transferOwnership,
   updateHouseholdName,
+  updateHouseholdPreferences,
   updateHouseholdTimezone,
 } from "@/lib/actions"
 import { isValidTimeZone, type TimeZoneOption } from "@/lib/timezone"
+import { WEEKDAY_NAMES } from "@/lib/chores"
+import {
+  DATE_FORMAT_OPTIONS,
+  HOUR_CYCLE_OPTIONS,
+  type DateFormat,
+  type HourCycle,
+  type HouseholdPreferences,
+} from "@/lib/preferences"
+
+const selectClassName =
+  "h-8 rounded-lg border border-border bg-transparent px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 
 type MemberRow = {
   userId: string
@@ -29,6 +42,7 @@ type HouseholdSettingsProps = {
   name: string
   timeZone: string
   timeZoneOptions: TimeZoneOption[]
+  preferences: HouseholdPreferences
   inviteCode: string
   members: MemberRow[]
   currentUserId: string
@@ -39,6 +53,7 @@ export function HouseholdSettings({
   name,
   timeZone,
   timeZoneOptions,
+  preferences,
   inviteCode,
   members,
   currentUserId,
@@ -49,6 +64,12 @@ export function HouseholdSettings({
   const [editingName, setEditingName] = useState(false)
   const [householdName, setHouseholdName] = useState(name)
   const [selectedZone, setSelectedZone] = useState(timeZone)
+  const [weekStartsOn, setWeekStartsOn] = useState(preferences.weekStartsOn)
+  const [hourCycle, setHourCycle] = useState<HourCycle>(preferences.hourCycle)
+  const [dateFormat, setDateFormat] = useState<DateFormat>(preferences.dateFormat)
+  const [defaultIntervalDays, setDefaultIntervalDays] = useState(
+    String(preferences.defaultIntervalDays)
+  )
   const [confirmAction, setConfirmAction] = useState<"leave" | "delete" | null>(
     null
   )
@@ -62,6 +83,11 @@ export function HouseholdSettings({
 
   const isSoleMember = members.length <= 1
   const zoneChanged = selectedZone !== timeZone && isValidTimeZone(selectedZone)
+  const preferencesChanged =
+    weekStartsOn !== preferences.weekStartsOn ||
+    hourCycle !== preferences.hourCycle ||
+    dateFormat !== preferences.dateFormat ||
+    parseInt(defaultIntervalDays, 10) !== preferences.defaultIntervalDays
 
   const handleSaveName = () => {
     startTransition(async () => {
@@ -87,6 +113,22 @@ export function HouseholdSettings({
         toast.success("Timezone updated")
       } catch {
         toast.error("Could not update timezone")
+      }
+    })
+  }
+
+  const handleSavePreferences = () => {
+    startTransition(async () => {
+      try {
+        await updateHouseholdPreferences({
+          weekStartsOn,
+          hourCycle,
+          dateFormat,
+          defaultIntervalDays: parseInt(defaultIntervalDays, 10),
+        })
+        toast.success("Preferences updated")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not update preferences")
       }
     })
   }
@@ -368,6 +410,76 @@ export function HouseholdSettings({
           className="self-start"
           onClick={handleSaveZone}
           disabled={isPending || !zoneChanged}
+        >
+          {isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
+
+      <Separator />
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">Preferences</h2>
+
+        <label className="text-sm" htmlFor="household-week-start">Week starts on</label>
+        <select
+          id="household-week-start"
+          className={selectClassName}
+          value={String(weekStartsOn)}
+          onChange={(e) => setWeekStartsOn(parseInt(e.target.value, 10))}
+          disabled={isPending}
+        >
+          {WEEKDAY_NAMES.map((name, index) => (
+            <option key={name} value={String(index)}>{name}</option>
+          ))}
+        </select>
+
+        <label className="text-sm" htmlFor="household-hour-cycle">Time format</label>
+        <select
+          id="household-hour-cycle"
+          className={selectClassName}
+          value={hourCycle}
+          onChange={(e) => setHourCycle(e.target.value as HourCycle)}
+          disabled={isPending}
+        >
+          {HOUR_CYCLE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <label className="text-sm" htmlFor="household-date-format">Date format</label>
+        <select
+          id="household-date-format"
+          className={selectClassName}
+          value={dateFormat}
+          onChange={(e) => setDateFormat(e.target.value as DateFormat)}
+          disabled={isPending}
+        >
+          {DATE_FORMAT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <label className="text-sm" htmlFor="household-default-interval">
+          Default chore interval (days)
+        </label>
+        <Input
+          id="household-default-interval"
+          className="w-24"
+          type="number"
+          min="1"
+          max="1000"
+          value={defaultIntervalDays}
+          onChange={(e) => setDefaultIntervalDays(e.target.value)}
+          disabled={isPending}
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Prefills the interval when adding a chore.
+        </p>
+        <Button
+          className="self-start"
+          onClick={handleSavePreferences}
+          disabled={isPending || !preferencesChanged}
         >
           {isPending ? "Saving…" : "Save"}
         </Button>

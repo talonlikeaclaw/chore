@@ -14,6 +14,7 @@ import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actio
 import { ChoreRow } from "./chore-row"
 import { RecurrenceFields } from "@/components/recurrence-fields"
 import type { Chore, Room } from "./types"
+import type { DateFormat } from "@/lib/preferences"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
@@ -24,6 +25,8 @@ type RoomSectionProps = {
   isDragActive?: boolean
   timeZone: string
   now: Date
+  dateFormat: DateFormat
+  defaultIntervalDays: number
 }
 
 function sortByOverdue(chores: Chore[], timeZone: string): Chore[] {
@@ -34,7 +37,7 @@ function sortByOverdue(chores: Chore[], timeZone: string): Chore[] {
   })
 }
 
-export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive, timeZone, now }: RoomSectionProps) {
+export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive, timeZone, now, dateFormat, defaultIntervalDays }: RoomSectionProps) {
   const [open, setOpen] = useState(true)
   const [editingName, setEditingName] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -42,7 +45,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
   const [addingChore, setAddingChore] = useState(false)
   const [newChoreName, setNewChoreName] = useState("")
   const [newChoreRecurrence, setNewChoreRecurrence] = useState<Recurrence>("days")
-  const [newChoreCount, setNewChoreCount] = useState("7")
+  const [newChoreCount, setNewChoreCount] = useState(String(defaultIntervalDays))
   const [newChoreWeekday, setNewChoreWeekday] = useState("0")
   const [newChoreMonthDay, setNewChoreMonthDay] = useState("1")
   const [isPending, startTransition] = useTransition()
@@ -110,7 +113,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
       await createChore(room.id, newChoreName.trim(), normalized)
       setNewChoreName("")
       setNewChoreRecurrence("days")
-      setNewChoreCount("7")
+      setNewChoreCount(String(defaultIntervalDays))
       setNewChoreWeekday("0")
       setNewChoreMonthDay("1")
       setAddingChore(false)
@@ -121,7 +124,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
     setAddingChore(false)
     setNewChoreName("")
     setNewChoreRecurrence("days")
-    setNewChoreCount("7")
+    setNewChoreCount(String(defaultIntervalDays))
     setNewChoreWeekday("0")
     setNewChoreMonthDay("1")
   }
@@ -246,6 +249,7 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
                 onMarkDone={onMarkDone}
                 timeZone={timeZone}
                 now={now}
+                dateFormat={dateFormat}
               />
             ))}
             {addingChore ? (

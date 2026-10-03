@@ -9,6 +9,7 @@ import { db } from "@/db"
 import { chores, completions, households, householdMembers, rooms } from "@/db/schema"
 import { isValidTimeZone } from "@/lib/timezone"
 import type { ChoreRecurrence } from "@/lib/chores"
+import { normalizeHouseholdPreferences } from "@/lib/preferences"
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -108,6 +109,21 @@ export async function updateHouseholdTimezone(timeZone: string): Promise<void> {
     .where(eq(households.id, householdId))
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
+  revalidatePath("/household")
+}
+
+export async function updateHouseholdPreferences(input: {
+  weekStartsOn: number
+  hourCycle: string
+  dateFormat: string
+  defaultIntervalDays: number
+}): Promise<void> {
+  const householdId = await getUserHouseholdId()
+  const preferences = normalizeHouseholdPreferences(input)
+  await db.update(households).set(preferences).where(eq(households.id, householdId))
+  globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
+  revalidatePath("/dashboard")
+  revalidatePath("/history")
   revalidatePath("/household")
 }
 

@@ -10,6 +10,7 @@ import {
 import { getDueBucket, getDueDate, type DueBucket } from "@/lib/chores"
 import { ChoreRow } from "./chore-row"
 import type { Room } from "./types"
+import type { DateFormat } from "@/lib/preferences"
 
 type DueSoonProps = {
   rooms: Room[]
@@ -17,6 +18,7 @@ type DueSoonProps = {
   onMarkDone: (choreId: string) => void
   timeZone: string
   now: Date
+  dateFormat: DateFormat
 }
 
 const BUCKETS: ReadonlyArray<{ key: DueBucket; label: string }> = [
@@ -31,6 +33,7 @@ export function DueSoon({
   onMarkDone,
   timeZone,
   now,
+  dateFormat,
 }: DueSoonProps) {
   const [open, setOpen] = useState(true)
 
@@ -83,6 +86,7 @@ export function DueSoon({
                     onMarkDone={onMarkDone}
                     timeZone={timeZone}
                     now={now}
+                    dateFormat={dateFormat}
                   />
                 ))}
               </div>

@@ -1,4 +1,5 @@
 import { addCivilDays, civilDaysBetween, toCivilDate } from "./timezone"
+import type { DateFormat } from "./preferences"
 
 export type LastCompletion = {
   completedAt: Date
@@ -228,25 +229,49 @@ export function getDueBucket(
   return "later"
 }
 
-const dueDateFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-})
+// `en-AU` renders day-month with a consistent comma ("Fri, 2 Oct" / "Sat, 2 Oct
+// 2027"); `en-GB` omits the comma unless a year is present.
+const dueDateFormatters: Record<DateFormat, Intl.DateTimeFormat> = {
+  mdy: new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }),
+  dmy: new Intl.DateTimeFormat("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }),
+}
 
-const dueDateWithYearFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-})
+const dueDateWithYearFormatters: Record<DateFormat, Intl.DateTimeFormat> = {
+  mdy: new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }),
+  dmy: new Intl.DateTimeFormat("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }),
+}
 
-/** "Sat, Oct 3"; appends ", 2027" when the due year differs from `now`'s local year. */
-export function formatDueDate(dueDate: Date, now: Date, timeZone: string): string {
+/** "Sat, Oct 3" / "Sat, 3 Oct"; appends the year when it differs from `now`'s local year. */
+export function formatDueDate(
+  dueDate: Date,
+  now: Date,
+  timeZone: string,
+  dateFormat: DateFormat
+): string {
   const currentYear = toCivilDate(now, timeZone).getUTCFullYear()
   return dueDate.getUTCFullYear() === currentYear
-    ? dueDateFormatter.format(dueDate)
-    : dueDateWithYearFormatter.format(dueDate)
+    ? dueDateFormatters[dateFormat].format(dueDate)
+    : dueDateWithYearFormatters[dateFormat].format(dueDate)
 }

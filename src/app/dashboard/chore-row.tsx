@@ -19,6 +19,7 @@ import { getDaysAgo } from "@/lib/timezone"
 import { updateChore, deleteChore, undoDeleteChore } from "@/lib/actions"
 import { RecurrenceFields } from "@/components/recurrence-fields"
 import type { Chore } from "./types"
+import type { DateFormat } from "@/lib/preferences"
 
 type ChoreRowProps = {
   chore: Chore
@@ -27,9 +28,10 @@ type ChoreRowProps = {
   onMarkDone: (choreId: string) => void
   timeZone: string
   now: Date
+  dateFormat: DateFormat
 }
 
-export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, timeZone, now }: ChoreRowProps) {
+export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, timeZone, now, dateFormat }: ChoreRowProps) {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editName, setEditName] = useState(chore.name)
@@ -171,7 +173,7 @@ export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, ti
           {!isOptimisticallyDone &&
             (overdueDays > 0 ? (
               <Badge variant="destructive">
-                Overdue · {formatDueDate(dueDate, now, timeZone)}
+                Overdue · {formatDueDate(dueDate, now, timeZone, dateFormat)}
               </Badge>
             ) : daysUntilDue === 0 ? (
               <Badge variant="outline" className="border-amber-500 text-amber-600">
@@ -179,7 +181,7 @@ export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, ti
               </Badge>
             ) : (
               <Badge variant="secondary">
-                Due {formatDueDate(dueDate, now, timeZone)}
+                Due {formatDueDate(dueDate, now, timeZone, dateFormat)}
               </Badge>
             ))}
         </span>

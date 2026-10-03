@@ -80,6 +80,10 @@ export const households = pgTable("household", {
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
   timezone: text("timezone").notNull().default("UTC"),
+  weekStartsOn: integer("week_starts_on").notNull().default(1),
+  hourCycle: text("hour_cycle", { enum: ["h12", "h23"] }).notNull().default("h23"),
+  dateFormat: text("date_format", { enum: ["mdy", "dmy"] }).notNull().default("mdy"),
+  defaultIntervalDays: integer("default_interval_days").notNull().default(7),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -30,6 +30,7 @@ export default async function HistoryPage() {
 
   const householdId = membership.householdId
   const timeZone = membership.household.timezone
+  const { weekStartsOn, hourCycle, dateFormat } = membership.household
   const now = new Date()
 
   const memberRows = await db
@@ -78,8 +79,8 @@ export default async function HistoryPage() {
         memberTotals={getMemberTotals(entries, memberRows)}
         roomTotals={getRoomTotals(entries)}
         cadence={getCadence(entries, timeZone)}
-        weeks={getWeeklyTrend(entries, now, timeZone)}
-        log={getHistoryLog(entries, now, timeZone)}
+        weeks={getWeeklyTrend(entries, now, timeZone, { weekStartsOn, dateFormat })}
+        log={getHistoryLog(entries, now, timeZone, { hourCycle, dateFormat })}
       />
     </main>
   )

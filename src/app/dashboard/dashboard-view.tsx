@@ -26,6 +26,7 @@ import { RoomSection } from "./room-section"
 import { DueSoon } from "./due-soon"
 import { getSocket } from "@/lib/socket"
 import type { Room } from "./types"
+import type { DateFormat } from "@/lib/preferences"
 
 type DashboardViewProps = {
   rooms: Room[]
@@ -34,9 +35,11 @@ type DashboardViewProps = {
   householdName: string
   timeZone: string
   now: Date
+  dateFormat: DateFormat
+  defaultIntervalDays: number
 }
 
-export function DashboardView({ rooms, inviteCode, householdId, householdName, timeZone, now }: DashboardViewProps) {
+export function DashboardView({ rooms, inviteCode, householdId, householdName, timeZone, now, dateFormat, defaultIntervalDays }: DashboardViewProps) {
   const router = useRouter()
   const [addingRoom, setAddingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
@@ -142,6 +145,7 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName, t
         onMarkDone={handleMarkDone}
         timeZone={timeZone}
         now={now}
+        dateFormat={dateFormat}
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
@@ -173,6 +177,8 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName, t
               isDragActive={room.id === activeId}
               timeZone={timeZone}
               now={now}
+              dateFormat={dateFormat}
+              defaultIntervalDays={defaultIntervalDays}
             />
           ))}
         </SortableContext>

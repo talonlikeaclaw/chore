@@ -53,7 +53,9 @@ Breaking one of these regresses something silently.
 - Due-date labels (`formatDueDate`, `getDueBucket`) format a **civil date** with a `timeZone: "UTC"` formatter, matching `history.ts`; only the cross-year decision uses the household zone. Formatters are module-level, never per-render.
 - The `Due soon` panel on `/dashboard` duplicates rows that also appear under their rooms; both read the same `optimisticDoneIds`, so `Mark Done` in either place updates both.
 - Timezone options come from `getTimeZoneOptions()` on the server (hydration-stable, and offsets are resolved with full ICU); the browser's `Intl.supportedValuesOf` is deliberately not used. Node 24 slim ships full ICU.
-- `/history` stats are all-time and live in `src/lib/history.ts` (pure: `now` and `timeZone` are arguments); only the log is capped, at the most recent 100 completions. Weeks are Monday-start — there is no week-start preference yet.
+- `/history` stats are all-time and live in `src/lib/history.ts` (pure: `now` and `timeZone` are arguments); only the log is capped, at the most recent 100 completions. Weeks start on `household.week_starts_on` (default Monday), and the log/day/week labels follow `household.date_format`; log times follow `household.hour_cycle`.
+- Household-wide display preferences live on `household`: `week_starts_on` (`0`–`6`), `hour_cycle` (`h12`/`h23`), `date_format` (`mdy`/`dmy`) and `default_interval_days` (prefills the add-chore count; the form still opens on "Days"). `src/lib/preferences.ts` holds the types, option labels and `normalizeHouseholdPreferences`; the member-editable `updateHouseholdPreferences` action validates through it. `date_format` only swaps the `Intl` formatter (US `en-US` vs day-month `en-AU`, chosen for a consistent comma) — due-date math is unchanged.
+- The app version is injected as `APP_VERSION` at build/run time and read through `src/lib/version.ts` (falls back to `dev`); it renders in the global footer (`layout.tsx`) and at `/api/health`. `docker-compose.yml` passes `APP_VERSION` (default `dev`) as a build arg.
 - `/history`'s cadence rows are described, not computed: `getCadenceVerdict` (tolerance = half a day or 5% of the target, whichever is larger) and `describeCadenceInterval` produce the words, `describeRecurrence` produces the schedule. `getTargetDays` uses exact weeks and the mean Gregorian month, so a punctual monthly chore never reads as late.
 
 ### Household authority
@@ -86,7 +88,7 @@ Breaking one of these regresses something silently.
 ### Database and migrations
 
 - Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`. **Never `drizzle-kit push`.**
-- Migrations `0000`–`0006` are applied; production runs them automatically in the `migrate` service before the app starts.
+- Migrations `0000`–`0007` are applied; production runs them automatically in the `migrate` service before the app starts.
 - `.env` holds `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — there is **no `DATABASE_URL`**. Compose sets `POSTGRES_HOST=db`; local dev defaults to `localhost`. Never shell-interpolate a `DATABASE_URL` — special characters in passwords break it.
 - Postgres 18+ mounts its volume at `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
 
@@ -104,11 +106,11 @@ Breaking one of these regresses something silently.
 - Version, changelog and tag move together: bump `package.json` (`npm version minor --no-git-tag-version`), move the `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, refresh the compare links, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
 - Annotated tags only. A tag message describes the tagged tree — never reference work that isn't in it.
 - Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
-- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03).
+- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03), `v0.6.0` (household preferences, version visibility, 2026-10-03).
 
 ## Testing
 
-- `npm run test:run` — 87 tests in 11 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
+- `npm run test:run` — 98 tests in 12 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), household preference validation, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
 - Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
 - For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
 - If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead. Signed-in pages can be grepped with `curl` by minting a cookie from an existing session row: `better-auth.session_token=encodeURIComponent("<session.token>." + base64(HMAC-SHA256(<BETTER_AUTH_SECRET>, <session.token>)))`.
@@ -138,8 +140,6 @@ INSERT INTO chore (id, name, room_id, interval_days, recurrence, recurrence_inte
 Unprioritised ideas established after the timezone/household work.
 
 - **Reminders / digest** at a household-local time (e.g. 8am local) — the timezone was the missing prerequisite.
-- **More household preferences** on `/household` — week start, 12/24h, date format, default chore interval.
 - **Per-user display timezone** — rendering-only; every date function already takes `timeZone`.
 - **CI** — no `.github/` yet; run test/lint/tsc/build on push and build+push the image on tag.
-- **Version visibility** — `ARG APP_VERSION` → `ENV APP_VERSION`, surfaced in the UI or `/api/health`, so "what's deployed" doesn't need a shell.
 - Closed by decision: a "Household" tab inside `AccountView` (the library hardcodes its nav), and per-user timezones for the _math_ (overdueness is shared).

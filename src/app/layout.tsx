@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Toaster } from "@/components/ui/sonner"
+import { APP_VERSION } from "@/lib/version"
 import { Providers } from "./providers"
 import "./globals.css"
 
@@ -25,6 +26,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
         <Toaster />
+        <footer className="mt-auto border-t border-border px-4 py-3 text-center text-xs text-muted-foreground">
+          {APP_VERSION}
+        </footer>
       </body>
     </html>
   )

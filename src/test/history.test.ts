@@ -169,11 +169,27 @@ describe("getWeeklyTrend", () => {
     ]
 
     expect(
-      getWeeklyTrend(entries, new Date("2026-01-10T12:00:00Z"), "UTC", 2)
+      getWeeklyTrend(entries, new Date("2026-01-10T12:00:00Z"), "UTC", { weeks: 2 })
     ).toEqual([
       { start: new Date("2025-12-29T00:00:00Z"), label: "Dec 29", count: 1, ratio: 1 },
       { start: new Date("2026-01-05T00:00:00Z"), label: "This week", count: 1, ratio: 1 },
     ])
+  })
+
+  it("starts weeks on the configured day", () => {
+    // Sunday-start: Saturday Jan 10 belongs to the week beginning Jan 4.
+    const entries = [makeEntry("c1", "2026-01-10T00:00:00Z")]
+
+    const trend = getWeeklyTrend(entries, new Date("2026-01-10T12:00:00Z"), "UTC", {
+      weekStartsOn: 0,
+      weeks: 2,
+    })
+
+    expect(trend.map((week) => week.start)).toEqual([
+      new Date("2025-12-28T00:00:00Z"),
+      new Date("2026-01-04T00:00:00Z"),
+    ])
+    expect(trend[1].count).toBe(1)
   })
 })
 
@@ -186,7 +202,7 @@ describe("getHistoryLog", () => {
       makeEntry("c4", "2026-01-01T00:00:00Z"),
     ]
 
-    const log = getHistoryLog(entries, new Date("2026-01-10T12:00:00Z"), "UTC", 3)
+    const log = getHistoryLog(entries, new Date("2026-01-10T12:00:00Z"), "UTC", { limit: 3 })
 
     expect(log.truncated).toBe(true)
     expect(log.total).toBe(4)
@@ -198,6 +214,28 @@ describe("getHistoryLog", () => {
     expect(log.groups[0].key).toBe("2026-01-10")
     expect(log.groups[0].entries[0].timeLabel).toBe("09:05")
     expect(log.groups[2].entries.map((entry) => entry.id)).toEqual(["c3"])
+  })
+
+  it("honours the 12-hour clock and day-month date format", () => {
+    const entries = [makeEntry("c1", "2026-01-10T09:05:00Z")]
+
+    const log = getHistoryLog(entries, new Date("2026-01-10T12:00:00Z"), "UTC", {
+      hourCycle: "h12",
+      dateFormat: "dmy",
+    })
+
+    expect(log.groups[0].entries[0].timeLabel).toBe("9:05 AM")
+    expect(log.groups.map((group) => group.label)).toEqual(["Today"])
+  })
+
+  it("renders day-month day headers for older entries in dmy", () => {
+    const entries = [makeEntry("c1", "2026-01-10T08:00:00Z")]
+
+    const log = getHistoryLog(entries, new Date("2026-01-12T12:00:00Z"), "UTC", {
+      dateFormat: "dmy",
+    })
+
+    expect(log.groups.map((group) => group.label)).toEqual(["Sat, 10 Jan"])
   })
 
   it("appends the year to dates outside the current local year", () => {

@@ -46,6 +46,12 @@ export default async function HouseholdPage() {
         name={membership.household.name}
         timeZone={membership.household.timezone}
         timeZoneOptions={getTimeZoneOptions()}
+        preferences={{
+          weekStartsOn: membership.household.weekStartsOn,
+          hourCycle: membership.household.hourCycle,
+          dateFormat: membership.household.dateFormat,
+          defaultIntervalDays: membership.household.defaultIntervalDays,
+        }}
         inviteCode={membership.household.inviteCode}
         members={members}
         currentUserId={session.user.id}

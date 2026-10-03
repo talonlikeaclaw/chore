@@ -14,6 +14,7 @@ vi.mock("@/lib/actions", () => ({
   leaveHousehold: vi.fn(),
   updateHouseholdName: vi.fn(),
   updateHouseholdTimezone: vi.fn(),
+  updateHouseholdPreferences: vi.fn(),
   removeMember: vi.fn(),
   transferOwnership: vi.fn(),
   regenerateInviteCode: vi.fn(),
@@ -45,6 +46,7 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
+        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
@@ -64,6 +66,7 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
+        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
@@ -81,6 +84,7 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
+        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
         inviteCode="invite-1"
         members={members}
         currentUserId="member-1"
@@ -100,6 +104,7 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
+        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
@@ -118,5 +123,27 @@ describe("HouseholdSettings", () => {
     expect(confirm.disabled).toBe(true)
     fireEvent.change(input, { target: { value: "Home" } })
     expect(confirm.disabled).toBe(false)
+  })
+
+  it("enables the Preferences save once a preference changes", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+      />
+    )
+
+    const saves = screen.getAllByRole("button", { name: "Save" }) as HTMLButtonElement[]
+    expect(saves.every((button) => button.disabled)).toBe(true)
+
+    fireEvent.change(screen.getByLabelText("Week starts on"), { target: { value: "0" } })
+
+    expect(saves.some((button) => !button.disabled)).toBe(true)
   })
 })

@@ -47,6 +47,8 @@ export default async function DashboardPage() {
       householdName={membership.household.name}
       timeZone={membership.household.timezone}
       now={new Date()}
+      dateFormat={membership.household.dateFormat}
+      defaultIntervalDays={membership.household.defaultIntervalDays}
     />
   )
 }

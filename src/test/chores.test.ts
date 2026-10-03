@@ -366,8 +366,14 @@ describe("getDueBucket", () => {
 describe("formatDueDate", () => {
   it("omits the year within the household's current local year", () => {
     expect(
-      formatDueDate(new Date("2026-10-02T00:00:00Z"), new Date("2026-10-02T12:00:00Z"), "UTC")
+      formatDueDate(new Date("2026-10-02T00:00:00Z"), new Date("2026-10-02T12:00:00Z"), "UTC", "mdy")
     ).toBe("Fri, Oct 2")
+  })
+
+  it("renders day-month order for the dmy format", () => {
+    expect(
+      formatDueDate(new Date("2026-10-02T00:00:00Z"), new Date("2026-10-02T12:00:00Z"), "UTC", "dmy")
+    ).toBe("Fri, 2 Oct")
   })
 
   it("appends the year when it differs", () => {
@@ -375,7 +381,8 @@ describe("formatDueDate", () => {
       formatDueDate(
         new Date("2027-01-01T00:00:00Z"),
         new Date("2026-12-30T12:00:00Z"),
-        "UTC"
+        "UTC",
+        "mdy"
       )
     ).toBe("Fri, Jan 1, 2027")
   })
@@ -386,7 +393,8 @@ describe("formatDueDate", () => {
       formatDueDate(
         new Date("2027-01-01T00:00:00Z"),
         new Date("2027-01-01T02:00:00Z"),
-        "America/New_York"
+        "America/New_York",
+        "mdy"
       )
     ).toBe("Fri, Jan 1, 2027")
   })

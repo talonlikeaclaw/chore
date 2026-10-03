@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
-## [Unreleased]
+## [0.6.0] - 2026-10-03
+
+### Added
+
+- Household preferences on `/household`: **week start day**, **12/24-hour
+  time**, **date format** (US `Oct 3` / International `3 Oct`), and a
+  **default chore interval** that prefills the add-chore count (the form still
+  opens on "Days"). New columns `household.week_starts_on`,
+  `household.hour_cycle`, `household.date_format`,
+  `household.default_interval_days` (migration
+  `0007_handy_molecule_man.sql`), the member-editable
+  `updateHouseholdPreferences` action, and `src/lib/preferences.ts`.
+- **Version visibility**: a build/runtime `APP_VERSION` (falling back to
+  `dev`) rendered in the global footer and returned by `GET /api/health`.
+  `docker-compose.yml` passes `APP_VERSION` as a build arg
+  (`APP_VERSION=$(git describe --tags) docker compose up --build -d`).
+
+### Changed
+
+- The `/history` weekly trend starts on the household's week-start day, history
+  day/week labels follow the date format, and log times follow the 12/24-hour
+  choice. Defaults (Monday weeks, 24-hour, US dates) leave existing households
+  unchanged; `date_format` only swaps the `Intl` formatter and never affects
+  due-date math.
+- `formatDueDate` takes a `DateFormat`; `getWeeklyTrend` and `getHistoryLog`
+  take an options object instead of trailing positional arguments.
+- The README's "Subsequent deploys" section now deploys a tagged release
+  (`git fetch --tags && git checkout <tag>`) instead of `git pull`.
 
 ## [0.5.0] - 2026-10-03
 
@@ -128,7 +155,8 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
-[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/talonlikeaclaw/chore/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/talonlikeaclaw/chore/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/talonlikeaclaw/chore/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/talonlikeaclaw/chore/compare/v0.2.0...v0.3.0
