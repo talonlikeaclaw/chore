@@ -23,25 +23,9 @@ import { Check, Link2, Loader2, Plus, X } from "lucide-react"
 import { createRoom, markDone, reorderRooms, undoCompletion } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { RoomSection } from "./room-section"
+import { DueSoon } from "./due-soon"
 import { getSocket } from "@/lib/socket"
-
-type Chore = {
-  id: string
-  name: string
-  intervalDays: number
-  createdAt: Date
-  completions: Array<{
-    completedAt: Date
-    user: { name: string }
-  }>
-}
-
-type Room = {
-  id: string
-  name: string
-  sortOrder: number
-  chores: Chore[]
-}
+import type { Room } from "./types"
 
 type DashboardViewProps = {
   rooms: Room[]
@@ -152,6 +136,13 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName, t
 
   return (
     <div className="flex flex-col gap-4">
+      <DueSoon
+        rooms={optimisticRooms}
+        optimisticDoneIds={optimisticDoneIds}
+        onMarkDone={handleMarkDone}
+        timeZone={timeZone}
+        now={now}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">{householdName}</h1>

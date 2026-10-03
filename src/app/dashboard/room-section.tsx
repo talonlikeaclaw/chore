@@ -8,31 +8,17 @@ import {
 } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, ChevronRight, GripVertical, Loader2, Pencil, Plus, Trash2, X } from "lucide-react"
-import { getDueDate } from "@/lib/chores"
+import { getDueDate, normalizeRecurrence, type ChoreRecurrence, type Recurrence } from "@/lib/chores"
 import { toast } from "sonner"
 import { createChore, deleteRoom, undoDeleteRoom, updateRoom } from "@/lib/actions"
 import { ChoreRow } from "./chore-row"
+import { RecurrenceFields } from "@/components/recurrence-fields"
+import type { Chore, Room } from "./types"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
-type Chore = {
-  id: string
-  name: string
-  intervalDays: number
-  createdAt: Date
-  completions: Array<{
-    completedAt: Date
-    user: { name: string }
-  }>
-}
-
 type RoomSectionProps = {
-  room: {
-    id: string
-    name: string
-    sortOrder: number
-    chores: Chore[]
-  }
+  room: Room
   optimisticDoneIds: Set<string>
   onMarkDone: (choreId: string) => void
   isDragActive?: boolean
@@ -55,7 +41,10 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
   const [roomName, setRoomName] = useState(room.name)
   const [addingChore, setAddingChore] = useState(false)
   const [newChoreName, setNewChoreName] = useState("")
-  const [newChoreInterval, setNewChoreInterval] = useState("7")
+  const [newChoreRecurrence, setNewChoreRecurrence] = useState<Recurrence>("days")
+  const [newChoreCount, setNewChoreCount] = useState("7")
+  const [newChoreWeekday, setNewChoreWeekday] = useState("0")
+  const [newChoreMonthDay, setNewChoreMonthDay] = useState("1")
   const [isPending, startTransition] = useTransition()
 
   const {
@@ -101,19 +90,29 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
   }
 
   const handleAddChore = () => {
-    const interval = parseInt(newChoreInterval, 10)
     if (!newChoreName.trim()) {
       toast.warning("Enter a chore name")
       return
     }
-    if (!interval || interval < 1) {
-      toast.warning("Enter a valid interval in days")
+    let normalized: ChoreRecurrence
+    try {
+      normalized = normalizeRecurrence({
+        recurrence: newChoreRecurrence,
+        count: parseInt(newChoreCount, 10),
+        weekday: parseInt(newChoreWeekday, 10),
+        monthDay: parseInt(newChoreMonthDay, 10),
+      })
+    } catch (error) {
+      toast.warning(error instanceof Error ? error.message : "Invalid recurrence")
       return
     }
     startTransition(async () => {
-      await createChore(room.id, newChoreName.trim(), interval)
+      await createChore(room.id, newChoreName.trim(), normalized)
       setNewChoreName("")
-      setNewChoreInterval("")
+      setNewChoreRecurrence("days")
+      setNewChoreCount("7")
+      setNewChoreWeekday("0")
+      setNewChoreMonthDay("1")
       setAddingChore(false)
     })
   }
@@ -121,7 +120,10 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
   const cancelAddChore = () => {
     setAddingChore(false)
     setNewChoreName("")
-    setNewChoreInterval("7")
+    setNewChoreRecurrence("days")
+    setNewChoreCount("7")
+    setNewChoreWeekday("0")
+    setNewChoreMonthDay("1")
   }
 
   const header = (() => {
@@ -259,18 +261,18 @@ export function RoomSection({ room, optimisticDoneIds, onMarkDone, isDragActive,
                   }}
                   autoFocus
                 />
-                <input
-                  className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  type="number"
-                  min="1"
-                  value={newChoreInterval}
-                  onChange={(e) => setNewChoreInterval(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddChore()
-                    if (e.key === "Escape") cancelAddChore()
-                  }}
+                <RecurrenceFields
+                  recurrence={newChoreRecurrence}
+                  onRecurrenceChange={setNewChoreRecurrence}
+                  count={newChoreCount}
+                  onCountChange={setNewChoreCount}
+                  weekday={newChoreWeekday}
+                  onWeekdayChange={setNewChoreWeekday}
+                  monthDay={newChoreMonthDay}
+                  onMonthDayChange={setNewChoreMonthDay}
+                  onEnter={handleAddChore}
+                  onEscape={cancelAddChore}
                 />
-                <span className="shrink-0 text-xs text-muted-foreground">days</span>
                 <Button size="icon-touch" variant="ghost" onClick={handleAddChore}>
                   <Check className="h-4 w-4" />
                 </Button>

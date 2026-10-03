@@ -4,6 +4,7 @@ import {
   getDaysAgo,
   toCivilDate,
 } from "./timezone"
+import { getTargetDays, type Recurrence } from "./chores"
 
 export type CompletionEntry = {
   id: string
@@ -11,6 +12,10 @@ export type CompletionEntry = {
   choreId: string
   choreName: string
   intervalDays: number
+  recurrence: Recurrence
+  recurrenceInterval: number
+  recurrenceWeekday: number
+  recurrenceMonthDay: number
   roomId: string
   roomName: string
   userId: string
@@ -108,9 +113,53 @@ export type CadenceRow = {
   choreId: string
   choreName: string
   roomName: string
+  intervalDays: number
+  recurrence: Recurrence
+  recurrenceInterval: number
+  recurrenceWeekday: number
+  recurrenceMonthDay: number
   targetDays: number
   actualDays: number
   deltaDays: number
+}
+
+/** How far apart a chore is actually done, in words. */
+export type CadenceVerdict = {
+  state: "on-schedule" | "early" | "late"
+  label: string
+}
+
+/** Half a day either way is noise on a short cadence… */
+const CADENCE_MIN_TOLERANCE_DAYS = 0.5
+/** …and 5% of the target on a long one, so a 31-day month reads on schedule. */
+const CADENCE_TOLERANCE_RATIO = 0.05
+
+/** Plain-language verdict for one cadence row. */
+export function getCadenceVerdict(
+  row: Pick<CadenceRow, "actualDays" | "targetDays">
+): CadenceVerdict {
+  const delta = row.actualDays - row.targetDays
+  const tolerance = Math.max(
+    CADENCE_MIN_TOLERANCE_DAYS,
+    row.targetDays * CADENCE_TOLERANCE_RATIO
+  )
+  if (Math.abs(delta) < tolerance) {
+    return { state: "on-schedule", label: "On schedule" }
+  }
+  const days = Math.round(Math.abs(delta))
+  const unit = days === 1 ? "day" : "days"
+  return delta < 0
+    ? { state: "early", label: `${days} ${unit} early` }
+    : { state: "late", label: `${days} ${unit} late` }
+}
+
+/** "usually 13 days apart" — 1 decimal only when the mean is not whole. */
+export function describeCadenceInterval(days: number): string {
+  const whole = Math.round(days)
+  const isWhole = Math.abs(days - whole) < 0.05
+  const text = isWhole ? String(whole) : days.toFixed(1)
+  const unit = isWhole && whole === 1 ? "day" : "days"
+  return `usually ${text} ${unit} apart`
 }
 
 /**
@@ -149,11 +198,16 @@ export function getCadence(
     }
 
     const actualDays = totalDays / (group.length - 1)
-    const targetDays = group[0].intervalDays
+    const targetDays = getTargetDays(group[0])
     rows.push({
       choreId: group[0].choreId,
       choreName: group[0].choreName,
       roomName: group[0].roomName,
+      intervalDays: group[0].intervalDays,
+      recurrence: group[0].recurrence,
+      recurrenceInterval: group[0].recurrenceInterval,
+      recurrenceWeekday: group[0].recurrenceWeekday,
+      recurrenceMonthDay: group[0].recurrenceMonthDay,
       targetDays,
       actualDays,
       deltaDays: actualDays - targetDays,

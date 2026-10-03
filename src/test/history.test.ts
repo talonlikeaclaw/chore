@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest"
+import { describeRecurrence } from "@/lib/chores"
 import {
+  describeCadenceInterval,
   getCadence,
+  getCadenceVerdict,
   getHistoryLog,
   getHistoryTotals,
   getMemberTotals,
@@ -20,6 +23,10 @@ function makeEntry(
     choreId: "chore-1",
     choreName: "Wash dishes",
     intervalDays: 1,
+    recurrence: "days",
+    recurrenceInterval: 1,
+    recurrenceWeekday: 0,
+    recurrenceMonthDay: 1,
     roomId: "room-1",
     roomName: "Kitchen",
     userId: "user-1",
@@ -103,6 +110,11 @@ describe("getCadence", () => {
         choreId: "y",
         choreName: "Clean toilet",
         roomName: "Kitchen",
+        intervalDays: 1,
+        recurrence: "days",
+        recurrenceInterval: 1,
+        recurrenceWeekday: 0,
+        recurrenceMonthDay: 1,
         targetDays: 1,
         actualDays: 1,
         deltaDays: 0,
@@ -111,6 +123,11 @@ describe("getCadence", () => {
         choreId: "x",
         choreName: "Wash dishes",
         roomName: "Kitchen",
+        intervalDays: 3,
+        recurrence: "days",
+        recurrenceInterval: 1,
+        recurrenceWeekday: 0,
+        recurrenceMonthDay: 1,
         targetDays: 3,
         actualDays: 2.5,
         deltaDays: -0.5,
@@ -130,6 +147,11 @@ describe("getCadence", () => {
         choreId: "d",
         choreName: "Wash dishes",
         roomName: "Kitchen",
+        intervalDays: 2,
+        recurrence: "days",
+        recurrenceInterval: 1,
+        recurrenceWeekday: 0,
+        recurrenceMonthDay: 1,
         targetDays: 2,
         actualDays: 2,
         deltaDays: 0,
@@ -185,5 +207,98 @@ describe("getHistoryLog", () => {
 
     expect(log.truncated).toBe(false)
     expect(log.groups.map((group) => group.label)).toEqual(["Sat, Dec 20, 2025"])
+  })
+})
+
+describe("getCadence — recurrence passthrough", () => {
+  it("carries a weekly chore's cadence so it can be described in words", () => {
+    const entries = [
+      makeEntry("w2", "2026-01-17T00:00:00Z", {
+        choreId: "w",
+        recurrence: "weekly",
+        intervalDays: 1,
+        recurrenceInterval: 2,
+        recurrenceWeekday: 6,
+      }),
+      makeEntry("w1", "2026-01-03T00:00:00Z", {
+        choreId: "w",
+        recurrence: "weekly",
+        intervalDays: 1,
+        recurrenceInterval: 2,
+        recurrenceWeekday: 6,
+      }),
+    ]
+
+    const [row] = getCadence(entries, "UTC")
+
+    expect(describeRecurrence(row)).toBe("Every 2 weeks on Saturday")
+    expect(row.targetDays).toBe(14)
+    expect(row.actualDays).toBe(14)
+    expect(getCadenceVerdict(row)).toEqual({ state: "on-schedule", label: "On schedule" })
+  })
+
+  it("measures a monthly chore against the mean Gregorian month", () => {
+    const entries = [
+      makeEntry("m2", "2026-02-01T00:00:00Z", {
+        choreId: "m",
+        recurrence: "monthly",
+        intervalDays: 1,
+        recurrenceMonthDay: 1,
+      }),
+      makeEntry("m1", "2026-01-01T00:00:00Z", {
+        choreId: "m",
+        recurrence: "monthly",
+        intervalDays: 1,
+        recurrenceMonthDay: 1,
+      }),
+    ]
+
+    const [row] = getCadence(entries, "UTC")
+
+    // A 31-day gap on a mean 30.44-day month is still "on schedule".
+    expect(row.actualDays).toBe(31)
+    expect(getCadenceVerdict(row).state).toBe("on-schedule")
+  })
+})
+
+describe("getCadenceVerdict", () => {
+  it("calls anything inside the tolerance on schedule", () => {
+    expect(getCadenceVerdict({ actualDays: 7, targetDays: 7 })).toEqual({
+      state: "on-schedule",
+      label: "On schedule",
+    })
+    expect(getCadenceVerdict({ actualDays: 7.4, targetDays: 7 }).state).toBe("on-schedule")
+    expect(getCadenceVerdict({ actualDays: 6.6, targetDays: 7 }).state).toBe("on-schedule")
+    // Tolerance scales with the target: 5% of two weeks is most of a day.
+    expect(getCadenceVerdict({ actualDays: 14.6, targetDays: 14 }).state).toBe("on-schedule")
+    expect(getCadenceVerdict({ actualDays: 14.8, targetDays: 14 }).state).toBe("late")
+  })
+
+  it("reads a longer mean as late and a shorter one as early", () => {
+    expect(getCadenceVerdict({ actualDays: 9.5, targetDays: 7 })).toEqual({
+      state: "late",
+      label: "3 days late",
+    })
+    expect(getCadenceVerdict({ actualDays: 8, targetDays: 7 })).toEqual({
+      state: "late",
+      label: "1 day late",
+    })
+    expect(getCadenceVerdict({ actualDays: 13, targetDays: 14 })).toEqual({
+      state: "early",
+      label: "1 day early",
+    })
+    expect(getCadenceVerdict({ actualDays: 4, targetDays: 10 })).toEqual({
+      state: "early",
+      label: "6 days early",
+    })
+  })
+})
+
+describe("describeCadenceInterval", () => {
+  it("drops the decimal for whole days and pluralizes", () => {
+    expect(describeCadenceInterval(1)).toBe("usually 1 day apart")
+    expect(describeCadenceInterval(13)).toBe("usually 13 days apart")
+    expect(describeCadenceInterval(12.5)).toBe("usually 12.5 days apart")
+    expect(describeCadenceInterval(1.4)).toBe("usually 1.4 days apart")
   })
 })

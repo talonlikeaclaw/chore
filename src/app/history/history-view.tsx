@@ -3,15 +3,25 @@
 import { useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
+import { describeRecurrence } from "@/lib/chores"
 import { getSocket } from "@/lib/socket"
-import type {
-  CadenceRow,
-  HistoryTotals,
-  LogGroup,
-  MemberTotal,
-  RoomTotal,
-  WeekBucket,
+import {
+  describeCadenceInterval,
+  getCadenceVerdict,
+  type CadenceRow,
+  type CadenceVerdict,
+  type HistoryTotals,
+  type LogGroup,
+  type MemberTotal,
+  type RoomTotal,
+  type WeekBucket,
 } from "@/lib/history"
+
+const CADENCE_VERDICT_CLASSES: Record<CadenceVerdict["state"], string> = {
+  "on-schedule": "text-muted-foreground",
+  early: "font-medium text-emerald-600",
+  late: "font-medium text-amber-600",
+}
 
 type HistoryViewProps = {
   householdId: string
@@ -110,17 +120,43 @@ export function HistoryView({
 
           {cadence.length > 0 && (
             <Section title="Cadence">
-              {cadence.map((row) => (
-                <div key={row.choreId} className="flex justify-between gap-2">
-                  <span>
-                    {row.choreName}{" "}
-                    <span className="text-xs text-muted-foreground">{row.roomName}</span>
-                  </span>
-                  <span className="tabular-nums text-muted-foreground">
-                    every {row.actualDays.toFixed(1)}d vs {row.targetDays}d target
-                  </span>
-                </div>
-              ))}
+              <p className="mb-1 text-xs text-muted-foreground">
+                How often each chore actually gets done, compared with its
+                schedule.
+              </p>
+              <p className="mb-1 text-xs italic text-muted-foreground">
+                Averaged over the gaps between completions, so chores need at
+                least two.
+              </p>
+              {cadence.map((row) => {
+                const verdict = getCadenceVerdict(row)
+                return (
+                  <div
+                    key={row.choreId}
+                    className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0"
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">
+                        {row.choreName}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {row.roomName}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {describeRecurrence(row)}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col text-right">
+                      <span className={CADENCE_VERDICT_CLASSES[verdict.state]}>
+                        {verdict.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {describeCadenceInterval(row.actualDays)}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
             </Section>
           )}
 

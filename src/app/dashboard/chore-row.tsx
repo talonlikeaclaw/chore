@@ -5,32 +5,40 @@ import { toast } from "sonner"
 import { Check, Loader2, Pencil, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getDueDate, getDaysUntilDue, getOverdueDays } from "@/lib/chores"
+import {
+  describeRecurrence,
+  formatDueDate,
+  getDueDate,
+  getDaysUntilDue,
+  getOverdueDays,
+  normalizeRecurrence,
+  type ChoreRecurrence,
+  type Recurrence,
+} from "@/lib/chores"
 import { getDaysAgo } from "@/lib/timezone"
 import { updateChore, deleteChore, undoDeleteChore } from "@/lib/actions"
+import { RecurrenceFields } from "@/components/recurrence-fields"
+import type { Chore } from "./types"
 
 type ChoreRowProps = {
-  chore: {
-    id: string
-    name: string
-    intervalDays: number
-    createdAt: Date
-    completions: Array<{
-      completedAt: Date
-      user: { name: string }
-    }>
-  }
+  chore: Chore
+  roomName?: string
   isOptimisticallyDone: boolean
   onMarkDone: (choreId: string) => void
   timeZone: string
   now: Date
 }
 
-export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, now }: ChoreRowProps) {
+export function ChoreRow({ chore, roomName, isOptimisticallyDone, onMarkDone, timeZone, now }: ChoreRowProps) {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editName, setEditName] = useState(chore.name)
-  const [editInterval, setEditInterval] = useState(String(chore.intervalDays))
+  const [editRecurrence, setEditRecurrence] = useState<Recurrence>(chore.recurrence)
+  const [editCount, setEditCount] = useState(
+    String(chore.recurrence === "days" ? chore.intervalDays : chore.recurrenceInterval)
+  )
+  const [editWeekday, setEditWeekday] = useState(String(chore.recurrenceWeekday))
+  const [editMonthDay, setEditMonthDay] = useState(String(chore.recurrenceMonthDay))
   const [isPending, startTransition] = useTransition()
 
   const lastCompletion = chore.completions[0] ?? null
@@ -49,17 +57,24 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, no
   })()
 
   const handleSave = () => {
-    const interval = parseInt(editInterval, 10)
     if (!editName.trim()) {
       toast.warning("Enter a chore name")
       return
     }
-    if (!interval || interval < 1) {
-      toast.warning("Enter a valid interval in days")
+    let normalized: ChoreRecurrence
+    try {
+      normalized = normalizeRecurrence({
+        recurrence: editRecurrence,
+        count: parseInt(editCount, 10),
+        weekday: parseInt(editWeekday, 10),
+        monthDay: parseInt(editMonthDay, 10),
+      })
+    } catch (error) {
+      toast.warning(error instanceof Error ? error.message : "Invalid recurrence")
       return
     }
     startTransition(async () => {
-      await updateChore(chore.id, editName.trim(), interval)
+      await updateChore(chore.id, editName.trim(), normalized)
       setEditing(false)
     })
   }
@@ -80,7 +95,12 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, no
   const cancelEdit = () => {
     setEditing(false)
     setEditName(chore.name)
-    setEditInterval(String(chore.intervalDays))
+    setEditRecurrence(chore.recurrence)
+    setEditCount(
+      String(chore.recurrence === "days" ? chore.intervalDays : chore.recurrenceInterval)
+    )
+    setEditWeekday(String(chore.recurrenceWeekday))
+    setEditMonthDay(String(chore.recurrenceMonthDay))
   }
 
   if (editing) {
@@ -96,18 +116,18 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, no
           }}
           autoFocus
         />
-        <input
-          className="w-20 rounded border border-border bg-transparent px-2 py-1 text-center text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          type="number"
-          min="1"
-          value={editInterval}
-          onChange={(e) => setEditInterval(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave()
-            if (e.key === "Escape") cancelEdit()
-          }}
+        <RecurrenceFields
+          recurrence={editRecurrence}
+          onRecurrenceChange={setEditRecurrence}
+          count={editCount}
+          onCountChange={setEditCount}
+          weekday={editWeekday}
+          onWeekdayChange={setEditWeekday}
+          monthDay={editMonthDay}
+          onMonthDayChange={setEditMonthDay}
+          onEnter={handleSave}
+          onEscape={cancelEdit}
         />
-        <span className="shrink-0 text-xs text-muted-foreground">days</span>
         <Button size="icon-touch" variant="ghost" onClick={handleSave}>
           <Check className="h-4 w-4" />
         </Button>
@@ -139,32 +159,44 @@ export function ChoreRow({ chore, isOptimisticallyDone, onMarkDone, timeZone, no
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <div className="flex flex-col gap-1">
-        <span className="font-medium">{chore.name}</span>
-        <div className="flex flex-wrap items-center gap-2">
-          {overdueDays > 0 ? (
-            <Badge variant="destructive">{overdueDays}d overdue</Badge>
-          ) : isOptimisticallyDone || daysUntilDue > 0 ? (
-            <Badge variant="secondary">
-              {isOptimisticallyDone
-                ? `Due in ${chore.intervalDays}d`
-                : `Due in ${daysUntilDue}d`}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
-              Due today
+    <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {roomName && (
+            <Badge variant="outline" className="bg-muted/50">
+              {roomName}
             </Badge>
           )}
+          <span className="font-medium">{chore.name}</span>
+          {!isOptimisticallyDone &&
+            (overdueDays > 0 ? (
+              <Badge variant="destructive">
+                Overdue · {formatDueDate(dueDate, now, timeZone)}
+              </Badge>
+            ) : daysUntilDue === 0 ? (
+              <Badge variant="outline" className="border-amber-500 text-amber-600">
+                Due today
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                Due {formatDueDate(dueDate, now, timeZone)}
+              </Badge>
+            ))}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+          <span>{describeRecurrence(chore)}</span>
           {lastDoneText && (
-            <span className="text-xs text-muted-foreground">{lastDoneText}</span>
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{lastDoneText}</span>
+            </>
           )}
-        </div>
+        </span>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex w-full items-center gap-1 sm:w-auto sm:shrink-0">
         <Button
           size="lg"
-          className="flex-1 sm:flex-initial text-sm sm:text-base"
+          className="flex-1 text-sm sm:flex-initial sm:text-base"
           variant={isOptimisticallyDone ? "secondary" : "default"}
           disabled={isOptimisticallyDone}
           onClick={() => onMarkDone(chore.id)}

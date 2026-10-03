@@ -30,6 +30,10 @@ describe("chores table", () => {
     expect(cols).toHaveProperty("name");
     expect(cols).toHaveProperty("roomId");
     expect(cols).toHaveProperty("intervalDays");
+    expect(cols).toHaveProperty("recurrence");
+    expect(cols).toHaveProperty("recurrenceInterval");
+    expect(cols).toHaveProperty("recurrenceWeekday");
+    expect(cols).toHaveProperty("recurrenceMonthDay");
     expect(cols).toHaveProperty("assignedUserId");
     expect(cols).toHaveProperty("active");
     expect(cols).toHaveProperty("createdAt");

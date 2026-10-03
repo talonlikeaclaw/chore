@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { chores, completions, households, householdMembers, rooms } from "@/db/schema"
 import { isValidTimeZone } from "@/lib/timezone"
+import type { ChoreRecurrence } from "@/lib/chores"
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -326,7 +327,16 @@ type DeletedRoom = {
   name: string
   householdId: string
   createdAt: Date
-  chores: Array<{ id: string; name: string; intervalDays: number; createdAt: Date }>
+  chores: Array<{
+    id: string
+    name: string
+    intervalDays: number
+    recurrence: "days" | "weekly" | "monthly"
+    recurrenceInterval: number
+    recurrenceWeekday: number
+    recurrenceMonthDay: number
+    createdAt: Date
+  }>
 }
 
 export async function deleteRoom(roomId: string): Promise<DeletedRoom> {
@@ -350,6 +360,10 @@ export async function deleteRoom(roomId: string): Promise<DeletedRoom> {
       id: c.id,
       name: c.name,
       intervalDays: c.intervalDays,
+      recurrence: c.recurrence,
+      recurrenceInterval: c.recurrenceInterval,
+      recurrenceWeekday: c.recurrenceWeekday,
+      recurrenceMonthDay: c.recurrenceMonthDay,
       createdAt: c.createdAt,
     })),
   }
@@ -371,6 +385,10 @@ export async function undoDeleteRoom(data: DeletedRoom): Promise<void> {
         name: c.name,
         roomId: data.id,
         intervalDays: c.intervalDays,
+        recurrence: c.recurrence,
+        recurrenceInterval: c.recurrenceInterval,
+        recurrenceWeekday: c.recurrenceWeekday,
+        recurrenceMonthDay: c.recurrenceMonthDay,
         createdAt: new Date(c.createdAt),
       }))
     )
@@ -384,7 +402,7 @@ export async function undoDeleteRoom(data: DeletedRoom): Promise<void> {
 export async function createChore(
   roomId: string,
   name: string,
-  intervalDays: number
+  recurrence: ChoreRecurrence
 ): Promise<void> {
   const householdId = await getUserHouseholdId()
   const room = await db.query.rooms.findFirst({
@@ -395,7 +413,7 @@ export async function createChore(
     id: crypto.randomUUID(),
     name,
     roomId,
-    intervalDays,
+    ...recurrence,
   })
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
@@ -404,7 +422,7 @@ export async function createChore(
 export async function updateChore(
   choreId: string,
   name: string,
-  intervalDays: number
+  recurrence: ChoreRecurrence
 ): Promise<void> {
   const householdId = await getUserHouseholdId()
   const chore = await db.query.chores.findFirst({
@@ -415,7 +433,7 @@ export async function updateChore(
     throw new Error("Unauthorized")
   await db
     .update(chores)
-    .set({ name, intervalDays })
+    .set({ name, ...recurrence })
     .where(eq(chores.id, choreId))
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
@@ -426,6 +444,10 @@ type DeletedChore = {
   name: string
   roomId: string
   intervalDays: number
+  recurrence: "days" | "weekly" | "monthly"
+  recurrenceInterval: number
+  recurrenceWeekday: number
+  recurrenceMonthDay: number
   createdAt: Date
 }
 
@@ -445,6 +467,10 @@ export async function deleteChore(choreId: string): Promise<DeletedChore> {
     name: chore.name,
     roomId: chore.roomId,
     intervalDays: chore.intervalDays,
+    recurrence: chore.recurrence,
+    recurrenceInterval: chore.recurrenceInterval,
+    recurrenceWeekday: chore.recurrenceWeekday,
+    recurrenceMonthDay: chore.recurrenceMonthDay,
     createdAt: chore.createdAt,
   }
 }
@@ -460,6 +486,10 @@ export async function undoDeleteChore(data: DeletedChore): Promise<void> {
     name: data.name,
     roomId: data.roomId,
     intervalDays: data.intervalDays,
+    recurrence: data.recurrence,
+    recurrenceInterval: data.recurrenceInterval,
+    recurrenceWeekday: data.recurrenceWeekday,
+    recurrenceMonthDay: data.recurrenceMonthDay,
     createdAt: new Date(data.createdAt),
   })
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")

@@ -43,6 +43,13 @@
       "when": 1790994611749,
       "tag": "0005_last_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791043565223,
+      "tag": "0006_opposite_killraven",
+      "breakpoints": true
     }
   ]
 }

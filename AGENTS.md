@@ -33,9 +33,10 @@ Developed with AI coding agents, directed and reviewed by a human who commits, t
 
 - Routes: `/` welcome · `/dashboard` · `/history` · `/onboarding` · `/join/[inviteCode]` · `/household` · `/account/[[...settings]]` · `/auth/[path]` · `/api/auth/[...all]` · `/api/socketio` (Pages Router)
 - `src/lib/actions.ts` — all 20 Server Actions; membership resolves through `getUserMembership()`, and owner-only actions are gated by `requireOwner()`
-- `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — due/overdue · `src/lib/history.ts` — history stats/log (pure, takes `now`/`timeZone`) · `src/lib/socket.ts` — client singleton
+- `src/lib/timezone.ts` — every bit of date/zone math · `src/lib/chores.ts` — recurrence model, due/overdue math, bucketing and due-date labels · `src/lib/history.ts` — history stats/log (pure, takes `now`/`timeZone`) · `src/lib/socket.ts` — client singleton
 - `src/db/schema.ts` — single source of schema truth · `src/db/index.ts` — `db` singleton (globalThis, for dev HMR)
-- `src/components/ui/*` — Base UI wrappers · `src/components/timezone-combobox.tsx` — the zone picker
+- `src/components/ui/*` — Base UI wrappers · `src/components/timezone-combobox.tsx` — the zone picker · `src/components/recurrence-fields.tsx` — shared recurrence fields
+- `src/app/dashboard/types.ts` — the `Chore`/`Room` view types shared by `dashboard-view`, `room-section`, `chore-row` and `due-soon`
 
 ## Invariants
 
@@ -47,8 +48,13 @@ Breaking one of these regresses something silently.
 - `household.timezone` is household-wide, not per-user — overdueness is a shared concept.
 - Due/overdue are calendar days, so `getDueDate`/`getDaysUntilDue`/`getOverdueDays` all take `timeZone`; they flip at the household's local midnight.
 - Components receive `timeZone` and `now` as props from the server render. **No `new Date()` / `Date.now()` anywhere in a render path** — that is what keeps SSR and hydration byte-identical.
+- A chore's cadence is `recurrence` + its parameters, not `intervalDays` alone: `intervalDays` counts days and is read **only** when `recurrence = 'days'`; `recurrenceInterval` means weeks for `weekly` and months for `monthly`; `recurrenceWeekday` is `0 = Sunday … 6 = Saturday`; `recurrenceMonthDay` is `1–31` and clamps to the target month's last day. Anything that renders a cadence or compares against one goes through `describeRecurrence` / `getTargetDays` — never `intervalDays` directly.
+- Recurrence phase is anchored to the last completion's local civil day (the create day when never completed), and the due day is always strictly after it, so completing early or late re-phases the schedule.
+- Due-date labels (`formatDueDate`, `getDueBucket`) format a **civil date** with a `timeZone: "UTC"` formatter, matching `history.ts`; only the cross-year decision uses the household zone. Formatters are module-level, never per-render.
+- The `Due soon` panel on `/dashboard` duplicates rows that also appear under their rooms; both read the same `optimisticDoneIds`, so `Mark Done` in either place updates both.
 - Timezone options come from `getTimeZoneOptions()` on the server (hydration-stable, and offsets are resolved with full ICU); the browser's `Intl.supportedValuesOf` is deliberately not used. Node 24 slim ships full ICU.
 - `/history` stats are all-time and live in `src/lib/history.ts` (pure: `now` and `timeZone` are arguments); only the log is capped, at the most recent 100 completions. Weeks are Monday-start — there is no week-start preference yet.
+- `/history`'s cadence rows are described, not computed: `getCadenceVerdict` (tolerance = half a day or 5% of the target, whichever is larger) and `describeCadenceInterval` produce the words, `describeRecurrence` produces the schedule. `getTargetDays` uses exact weeks and the mean Gregorian month, so a punctual monthly chore never reads as late.
 
 ### Household authority
 
@@ -59,6 +65,7 @@ Breaking one of these regresses something silently.
 
 ### Rendering and client boundaries
 
+- The chore row (`chore-row.tsx`) is two tiers plus actions, and the shape is deliberate: the title line holds the room chip (an `outline` `Badge` with `bg-muted/50`, only when `roomName` is passed, i.e. the `Due soon` panel), then the chore name, then the due badge; the meta line holds the cadence and, after a `·`, `Last done by …`; the action buttons sit to the right of both on `sm+` and drop to a full-width row below the text on mobile. Don't inline room/cadence/badge into one wrapping line — that ragged-indented the cadence and last-done when badges changed width, and a plain muted room name between the title and the badge read as neither. Keep the chip on the badge default `text-foreground`: `text-muted-foreground` at 12px on the dark background is only ~7.6:1 and reads as washed-out gray.
 - Reuse the inline-edit pattern for rename/edit UIs: pencil → input → check/cross, Enter to save, Escape to cancel.
 - A function prop on a `"use client"` entry component raises Next's TS warning 71007; the repo tolerates it (e.g. `ChoreRow`'s `onMarkDone`).
 - Never call `setState` inside `useEffect` — `react-hooks/set-state-in-effect` is an eslint error here. Derive from props/state, or use `useSyncExternalStore` for client-only values (see the browser-timezone detection in `OnboardingView`).
@@ -79,7 +86,7 @@ Breaking one of these regresses something silently.
 ### Database and migrations
 
 - Schema changes: edit `src/db/schema.ts` → `npx drizzle-kit generate` → `npx drizzle-kit migrate`. **Never `drizzle-kit push`.**
-- Migrations `0000`–`0004` are applied; production runs them automatically in the `migrate` service before the app starts.
+- Migrations `0000`–`0006` are applied; production runs them automatically in the `migrate` service before the app starts.
 - `.env` holds `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` — there is **no `DATABASE_URL`**. Compose sets `POSTGRES_HOST=db`; local dev defaults to `localhost`. Never shell-interpolate a `DATABASE_URL` — special characters in passwords break it.
 - Postgres 18+ mounts its volume at `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
 
@@ -97,14 +104,14 @@ Breaking one of these regresses something silently.
 - Version, changelog and tag move together: bump `package.json` (`npm version minor --no-git-tag-version`), move the `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, refresh the compare links, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
 - Annotated tags only. A tag message describes the tagged tree — never reference work that isn't in it.
 - Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
-- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02).
+- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03).
 
 ## Testing
 
-- `npm run test:run` — 65 tests in 11 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
+- `npm run test:run` — 87 tests in 11 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
 - Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
 - For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
-- If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead.
+- If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead. Signed-in pages can be grepped with `curl` by minting a cookie from an existing session row: `better-auth.session_token=encodeURIComponent("<session.token>." + base64(HMAC-SHA256(<BETTER_AUTH_SECRET>, <session.token>)))`.
 
 ## Test data (dev)
 
@@ -117,9 +124,11 @@ INSERT INTO room (id, name, household_id, created_at, updated_at) VALUES
   ('room-1', 'Kitchen',  '<household-id>', now(), now()),
   ('room-2', 'Bathroom', '<household-id>', now(), now());
 
-INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated_at) VALUES
-  ('chore-1', 'Wash dishes',  'room-1', 1, true, now() - interval '3 days', now()),
-  ('chore-2', 'Clean toilet', 'room-2', 7, true, now() - interval '2 days', now());
+INSERT INTO chore (id, name, room_id, interval_days, recurrence, recurrence_interval, recurrence_weekday, recurrence_month_day, active, created_at, updated_at) VALUES
+  ('chore-1', 'Wash dishes',   'room-1', 1, 'days',    1, 0, 1, true, now() - interval '3 days', now()),
+  ('chore-2', 'Clean toilet',  'room-2', 7, 'days',    1, 0, 1, true, now() - interval '2 days', now()),
+  ('chore-3', 'Water plants',  'room-1', 1, 'weekly',  2, 6, 1, true, now(),                    now()),
+  ('chore-4', 'Change filter', 'room-2', 1, 'monthly', 1, 0, 1, true, now(),                    now());
 ```
 
 - Reset: `DELETE FROM completion; DELETE FROM chore; DELETE FROM room;` — or `DELETE FROM household;` to drop everything cascading from it.
@@ -129,8 +138,6 @@ INSERT INTO chore (id, name, room_id, interval_days, active, created_at, updated
 Unprioritised ideas established after the timezone/household work.
 
 - **Reminders / digest** at a household-local time (e.g. 8am local) — the timezone was the missing prerequisite.
-- **Due-date presentation** — "Due Fri, Oct 3" plus dashboard grouping (Overdue / Today / This week), straight from the civil-date helpers.
-- **Richer recurrence** — weekly-on-a-weekday, monthly-on-the-Nth, built on civil-date arithmetic rather than `intervalDays` alone.
 - **More household preferences** on `/household` — week start, 12/24h, date format, default chore interval.
 - **Per-user display timezone** — rendering-only; every date function already takes `timeZone`.
 - **CI** — no `.github/` yet; run test/lint/tsc/build on push and build+push the image on tag.

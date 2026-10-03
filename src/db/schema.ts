@@ -128,6 +128,12 @@ export const chores = pgTable(
       .notNull()
       .references(() => rooms.id, { onDelete: "cascade" }),
     intervalDays: integer("interval_days").notNull(),
+    recurrence: text("recurrence", { enum: ["days", "weekly", "monthly"] })
+      .notNull()
+      .default("days"),
+    recurrenceInterval: integer("recurrence_interval").notNull().default(1),
+    recurrenceWeekday: integer("recurrence_weekday").notNull().default(0),
+    recurrenceMonthDay: integer("recurrence_month_day").notNull().default(1),
     assignedUserId: text("assigned_user_id").references(() => user.id),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
