@@ -1,8 +1,14 @@
 "use client"
 
-import { useEffect, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { describeRecurrence } from "@/lib/chores"
 import { getSocket } from "@/lib/socket"
 import {
@@ -54,6 +60,9 @@ export function HistoryView({
   log,
 }: HistoryViewProps) {
   const router = useRouter()
+  // Open by default; long households can collapse it. The trend above stays
+  // visible either way, so a full cadence list no longer buries anything.
+  const [cadenceOpen, setCadenceOpen] = useState(true)
 
   useEffect(() => {
     const socket = getSocket()
@@ -118,48 +127,6 @@ export function HistoryView({
             </Section>
           )}
 
-          {cadence.length > 0 && (
-            <Section title="Cadence">
-              <p className="mb-1 text-xs text-muted-foreground">
-                How often each chore actually gets done, compared with its
-                schedule.
-              </p>
-              <p className="mb-1 text-xs italic text-muted-foreground">
-                Averaged over the gaps between completions, so chores need at
-                least two.
-              </p>
-              {cadence.map((row) => {
-                const verdict = getCadenceVerdict(row)
-                return (
-                  <div
-                    key={row.choreId}
-                    className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0"
-                  >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate">
-                        {row.choreName}{" "}
-                        <span className="text-xs text-muted-foreground">
-                          {row.roomName}
-                        </span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {describeRecurrence(row)}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col text-right">
-                      <span className={CADENCE_VERDICT_CLASSES[verdict.state]}>
-                        {verdict.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {describeCadenceInterval(row.actualDays)}
-                      </span>
-                    </span>
-                  </div>
-                )
-              })}
-            </Section>
-          )}
-
           <Section title="Last 8 weeks">
             {weeks.map((bucket) => (
               <div key={bucket.start.getTime()} className="flex items-center gap-2">
@@ -175,33 +142,90 @@ export function HistoryView({
             ))}
           </Section>
 
-          <div className="flex flex-col gap-4">
-            {log.groups.map((group) => (
-              <div key={group.key}>
-                <h2 className="text-sm font-medium text-muted-foreground">{group.label}</h2>
-                {group.entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="w-12 shrink-0 tabular-nums text-muted-foreground">
-                        {entry.timeLabel}
+          {cadence.length > 0 && (
+            <Collapsible open={cadenceOpen} onOpenChange={setCadenceOpen}>
+              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md text-left text-sm font-semibold hover:text-muted-foreground">
+                {cadenceOpen ? (
+                  <ChevronDown className="h-4 w-4 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                )}
+                Cadence
+                <span className="text-xs font-normal text-muted-foreground">
+                  {cadence.length}
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <p className="mt-1 mb-1 text-xs text-muted-foreground">
+                  How often each chore actually gets done, compared with its
+                  schedule.
+                </p>
+                <p className="mb-1 text-xs italic text-muted-foreground">
+                  Averaged over the gaps between completions, so chores need at
+                  least two.
+                </p>
+                {cadence.map((row) => {
+                  const verdict = getCadenceVerdict(row)
+                  return (
+                    <div
+                      key={row.choreId}
+                      className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0"
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">
+                          {row.choreName}{" "}
+                          <span className="text-xs text-muted-foreground">
+                            {row.roomName}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {describeRecurrence(row)}
+                        </span>
                       </span>
-                      <span className="font-medium">{entry.choreName}</span>
-                      <span className="truncate text-xs text-muted-foreground">{entry.roomName}</span>
-                    </span>
-                    <span className="shrink-0 text-sm text-muted-foreground">{entry.userName}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-            {log.truncated && (
-              <p className="text-xs text-muted-foreground">
-                Showing the most recent 100 of {log.total} completions.
-              </p>
-            )}
-          </div>
+                      <span className="flex shrink-0 flex-col text-right">
+                        <span className={CADENCE_VERDICT_CLASSES[verdict.state]}>
+                          {verdict.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {describeCadenceInterval(row.actualDays)}
+                        </span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          <Section title="Recent completions">
+            <div className="flex flex-col gap-4">
+              {log.groups.map((group) => (
+                <div key={group.key}>
+                  <h3 className="text-sm font-medium text-muted-foreground">{group.label}</h3>
+                  {group.entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between gap-4 border-b border-border py-2 last:border-0"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="w-12 shrink-0 tabular-nums text-muted-foreground">
+                          {entry.timeLabel}
+                        </span>
+                        <span className="font-medium">{entry.choreName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{entry.roomName}</span>
+                      </span>
+                      <span className="shrink-0 text-sm text-muted-foreground">{entry.userName}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {log.truncated && (
+                <p className="text-xs text-muted-foreground">
+                  Showing the most recent 100 of {log.total} completions.
+                </p>
+              )}
+            </div>
+          </Section>
         </>
       )}
     </div>

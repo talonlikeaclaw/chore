@@ -139,14 +139,6 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName, t
 
   return (
     <div className="flex flex-col gap-4">
-      <DueSoon
-        rooms={optimisticRooms}
-        optimisticDoneIds={optimisticDoneIds}
-        onMarkDone={handleMarkDone}
-        timeZone={timeZone}
-        now={now}
-        dateFormat={dateFormat}
-      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">{householdName}</h1>
@@ -157,6 +149,14 @@ export function DashboardView({ rooms, inviteCode, householdId, householdName, t
           Copy invite link
         </Button>
       </div>
+      <DueSoon
+        rooms={optimisticRooms}
+        optimisticDoneIds={optimisticDoneIds}
+        onMarkDone={handleMarkDone}
+        timeZone={timeZone}
+        now={now}
+        dateFormat={dateFormat}
+      />
       {optimisticRooms.length === 0 && !addingRoom && (
         <p className="text-center text-muted-foreground">
           No rooms yet. Add a room to get started.

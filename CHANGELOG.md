@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
+## [0.7.2] - 2026-10-03
+
+### Changed
+
+- `/history` reads summary → trend → detail: totals, `By member`, `By room`,
+  `Last 8 weeks`, then `Cadence` (previously last-but-one) and `Recent
+  completions`, so the trend chart is no longer buried under one row per chore.
+  Cadence is a collapsible list (open by default) whose trigger shows the chore
+  count.
+- The completion log on `/history` has a `Recent completions` heading.
+- `/dashboard` shows the household name and the invite button above the `Due
+  soon` panel instead of below it.
+
 ## [0.7.1] - 2026-10-03
 
 ### Fixed
@@ -179,7 +192,7 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
-[Unreleased]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...HEAD
+[0.7.2]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/talonlikeaclaw/chore/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/talonlikeaclaw/chore/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/talonlikeaclaw/chore/compare/v0.5.0...v0.6.0

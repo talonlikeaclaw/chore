@@ -57,6 +57,7 @@ Breaking one of these regresses something silently.
 - Household-wide display preferences live on `household`: `week_starts_on` (`0`–`6`), `hour_cycle` (`h12`/`h23`), `date_format` (`mdy`/`dmy`) and `default_interval_days` (prefills the add-chore count; the form still opens on "Days"). `src/lib/preferences.ts` holds the types, option labels and `normalizeHouseholdPreferences`; the member-editable `updateHouseholdPreferences` action validates through it. `date_format` only swaps the `Intl` formatter (US `en-US` vs day-month `en-AU`, chosen for a consistent comma) — due-date math is unchanged.
 - The app version is injected as `APP_VERSION` at build/run time and read through `src/lib/version.ts` (falls back to `dev`); it renders in the global footer (`layout.tsx`) and at `/api/health`. `docker-compose.yml` passes `APP_VERSION` (default `dev`) as a build arg.
 - `/history`'s cadence rows are described, not computed: `getCadenceVerdict` (tolerance = half a day or 5% of the target, whichever is larger) and `describeCadenceInterval` produce the words, `describeRecurrence` produces the schedule. `getTargetDays` uses exact weeks and the mean Gregorian month, so a punctual monthly chore never reads as late.
+- `/history` reads top-down as summary → trend → detail: totals, `By member`, `By room`, `Last 8 weeks`, then `Cadence`, then `Recent completions`. Cadence has one row per chore, so it is a `Collapsible` (open by default, trigger carries the count) and the trend sits directly above it — a full list must never push the trend chart out of view again.
 
 ### Household authority
 
@@ -69,6 +70,7 @@ Breaking one of these regresses something silently.
 
 - The chore row (`chore-row.tsx`) is two tiers plus actions, and the shape is deliberate: the title line holds the room chip (an `outline` `Badge` with `bg-muted/50`, only when `roomName` is passed, i.e. the `Due soon` panel), then the chore name, then the due badge; the meta line holds the cadence and, after a `·`, `Last done by …`; the action buttons sit to the right of both on `sm+` and drop to a full-width row below the text on mobile. Don't inline room/cadence/badge into one wrapping line — that ragged-indented the cadence and last-done when badges changed width, and a plain muted room name between the title and the badge read as neither. Keep the chip on the badge default `text-foreground`: `text-muted-foreground` at 12px on the dark background is only ~7.6:1 and reads as washed-out gray.
 - Reuse the inline-edit pattern for rename/edit UIs: pencil → input → check/cross, Enter to save, Escape to cancel.
+- `/dashboard` opens with the household name (`h1`) and the invite button, and only then the `Due soon` panel; the section order of both screens is deliberate — name first, then what needs doing.
 - A function prop on a `"use client"` entry component raises Next's TS warning 71007; the repo tolerates it (e.g. `ChoreRow`'s `onMarkDone`).
 - Never call `setState` inside `useEffect` — `react-hooks/set-state-in-effect` is an eslint error here. Derive from props/state, or use `useSyncExternalStore` for client-only values (see the browser-timezone detection in `OnboardingView`).
 
@@ -103,10 +105,10 @@ Breaking one of these regresses something silently.
 
 ## Releases
 
-- Version, changelog and tag move together: bump `package.json` (`npm version minor --no-git-tag-version`), move the `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, refresh the compare links, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
+- Version, changelog and tag move together: bump `package.json` (`npm version minor|patch --no-git-tag-version`), add a `## [X.Y.Z] - <date>` section to `CHANGELOG.md` (the file carries no `[Unreleased]` section between releases), refresh the compare links at the bottom, commit, then `git tag -a vX.Y.Z -m "…"` and `git push --follow-tags`.
 - Annotated tags only. A tag message describes the tagged tree — never reference work that isn't in it.
 - Below `1.0.0`, a minor bump may carry behaviour changes; call them out under **Changed** in the changelog.
-- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03), `v0.6.0` (household preferences, version visibility, 2026-10-03).
+- Tagged so far: `v0.1.0` (pre-timezone baseline, 2026-05-31), `v0.2.0` (household timezone + settings, 2026-10-02), `v0.3.0` (history screen, 2026-10-02), `v0.4.0` (membership enforcement, member management, join-page switch, 2026-10-02), `v0.5.0` (weekly/monthly recurrence, human-readable due dates, `Due soon` panel, 2026-10-03), `v0.6.0` (household preferences, version visibility, 2026-10-03), `v0.7.1` (CI, lint cleanup, 2026-10-03), `v0.7.2` (history section order, dashboard heading, 2026-10-03).
 
 ## CI
 
@@ -116,7 +118,7 @@ Breaking one of these regresses something silently.
 
 ## Testing
 
-- `npm run test:run` — 98 tests in 12 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), household preference validation, history stats/log math, timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
+- `npm run test:run` — 100 tests in 13 files (`src/test/`, plus `src/test/db/schema.test.ts`). Covers due/overdue/timezone math, recurrence math (weekly/monthly/clamping, normalization, labels, bucketing, due-date formatting), household preference validation, history stats/log math and the `/history` section order (trend above a collapsed cadence), timezone-combobox behaviour (filter, click, Enter, arrow-key selection), the user-menu entries, household member management UI, the join-page switch, and table shapes.
 - Server Actions are not unit-tested — they need a live server and a session. To exercise one end-to-end, call it from a temporary route handler with a real session cookie; Next's server-action id is **not** discoverable in dev builds, so a raw `Next-Action` POST usually 404s.
 - For `better-auth-ui` components, inject a session through `AuthUIProvider`'s `hooks.useSession` seam (see `src/test/nav-bar.test.tsx`). Stubbing global `fetch` does **not** intercept its session request.
 - If the managed Chromium can't launch (missing `libglib-2.0.so.0` on this box), verify client-only surfaces with jsdom tests plus SSR HTML greps instead. Signed-in pages can be grepped with `curl` by minting a cookie from an existing session row: `better-auth.session_token=encodeURIComponent("<session.token>." + base64(HMAC-SHA256(<BETTER_AUTH_SECRET>, <session.token>)))`.
