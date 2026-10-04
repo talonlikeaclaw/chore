@@ -7,6 +7,7 @@ import { asc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { householdMembers, user } from "@/db/schema"
+import { isMailConfigured } from "@/lib/mail-config"
 import { getTimeZoneOptions } from "@/lib/timezone"
 import { HouseholdSettings } from "./household-settings"
 
@@ -51,11 +52,16 @@ export default async function HouseholdPage() {
           hourCycle: membership.household.hourCycle,
           dateFormat: membership.household.dateFormat,
           defaultIntervalDays: membership.household.defaultIntervalDays,
+          digestEnabled: membership.household.digestEnabled,
+          digestDay: membership.household.digestDay,
+          digestHour: membership.household.digestHour,
         }}
         inviteCode={membership.household.inviteCode}
         members={members}
         currentUserId={session.user.id}
         isOwner={membership.role === "owner"}
+        mailConfigured={isMailConfigured()}
+        notifyDigest={membership.notifyDigest}
       />
     </main>
   )

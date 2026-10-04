@@ -50,6 +50,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      DIGEST_SCHEDULER: ${DIGEST_SCHEDULER:-}
     secrets:
       - postgres_password
       - better_auth_secret

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
+## [0.8.0] - 2026-10-04
+
+### Added
+
+- **Weekly digest email.** `/household` gains an `Email notifications` section
+  with `Send a weekly chore digest to members`, a household-local weekday
+  (`Send on`) and hour (`Send at`), plus `Email me the weekly digest` for your own
+  inbox. Both switches apply as you click them — the section has no Save button —
+  and the personal one is disabled with `Weekly digest is off for this household.`
+  until the household switch is on. The email lists the chores due in the next 7
+  days, grouped by room, using the dashboard's own `Overdue · …` / `Due today` /
+  `Due …` wording, and links back to `/dashboard`.
+- Mail goes over SMTP through `nodemailer`, configured by `SMTP_HOST`,
+  `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE` and `MAIL_FROM` — one
+  code path covers Resend (`smtp.resend.com:465`), Mailgun, Postmark, a Gmail app
+  password and a local relay. `SMTP_USER`/`SMTP_PASSWORD` may stay empty for an
+  unauthenticated relay, and `SMTP_PORT=465` implies TLS.
+- An in-process scheduler ticks every 15 minutes and sends whichever households
+  have crossed their local slot, so there is no sidecar and no cron to install.
+  `DIGEST_SCHEDULER=off` disables it. Each send records the slot's civil date on
+  the household, so restarts and repeated ticks cannot double-send, and a run
+  whose every send failed leaves the slot open for the next tick to retry.
+- A digest is skipped when nothing is due in the window or every recipient has
+  opted out — no "nothing due" mail, and the slot is still consumed. With
+  `SMTP_HOST` unset the digest is off and `/household` says how to enable it.
+
 ## [0.7.3] - 2026-10-03
 
 ### Changed
@@ -210,6 +236,7 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
+[0.8.0]: https://github.com/talonlikeaclaw/chore/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/talonlikeaclaw/chore/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/talonlikeaclaw/chore/compare/v0.7.0...v0.7.1

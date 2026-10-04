@@ -6,6 +6,9 @@ export type HouseholdPreferences = {
   hourCycle: HourCycle
   dateFormat: DateFormat
   defaultIntervalDays: number
+  digestEnabled: boolean
+  digestDay: number
+  digestHour: number
 }
 
 export const MAX_DEFAULT_INTERVAL_DAYS = 1000
@@ -37,6 +40,9 @@ export function normalizeHouseholdPreferences(input: {
   hourCycle: string
   dateFormat: string
   defaultIntervalDays: number
+  digestEnabled: boolean
+  digestDay: number
+  digestHour: number
 }): HouseholdPreferences {
   if (!Number.isInteger(input.weekStartsOn) || input.weekStartsOn < 0 || input.weekStartsOn > 6) {
     throw new Error("Choose a week start day")
@@ -54,10 +60,22 @@ export function normalizeHouseholdPreferences(input: {
   ) {
     throw new Error("Enter a default interval between 1 and 1000 days")
   }
+  if (typeof input.digestEnabled !== "boolean") {
+    throw new Error("Choose digest settings")
+  }
+  if (!Number.isInteger(input.digestDay) || input.digestDay < 0 || input.digestDay > 6) {
+    throw new Error("Choose a digest day")
+  }
+  if (!Number.isInteger(input.digestHour) || input.digestHour < 0 || input.digestHour > 23) {
+    throw new Error("Choose a digest time")
+  }
   return {
     weekStartsOn: input.weekStartsOn,
     hourCycle: input.hourCycle,
     dateFormat: input.dateFormat,
     defaultIntervalDays: input.defaultIntervalDays,
+    digestEnabled: input.digestEnabled,
+    digestDay: input.digestDay,
+    digestHour: input.digestHour,
   }
 }

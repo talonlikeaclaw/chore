@@ -57,6 +57,13 @@
       "when": 1791049552645,
       "tag": "0007_handy_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791054922349,
+      "tag": "0008_aromatic_redwing",
+      "breakpoints": true
     }
   ]
 }

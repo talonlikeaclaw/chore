@@ -5,6 +5,7 @@ import {
   getBrowserTimeZone,
   getDatePartsInTimeZone,
   getDaysAgo,
+  getHourInTimeZone,
   getTimeZoneOffsetLabel,
   getTimeZoneOptions,
   isValidTimeZone,
@@ -34,6 +35,28 @@ describe("toCivilDate", () => {
     expect(
       toCivilDate(new Date("2026-01-01T02:00:00Z"), "America/New_York")
     ).toEqual(new Date("2025-12-31T00:00:00Z"))
+  })
+})
+
+describe("getHourInTimeZone", () => {
+  it("returns the exact UTC hour", () => {
+    expect(getHourInTimeZone(new Date("2026-07-04T23:30:00Z"), "UTC")).toBe(23)
+  })
+
+  it("returns 0 at UTC midnight", () => {
+    expect(getHourInTimeZone(new Date("2026-07-04T00:15:00Z"), "UTC")).toBe(0)
+  })
+
+  it("shifts with a fixed-offset zone", () => {
+    // Etc/GMT+5 is UTC-5 (POSIX sign inversion).
+    expect(getHourInTimeZone(new Date("2026-07-04T03:00:00Z"), "Etc/GMT+5")).toBe(22)
+  })
+
+  it("uses the second occurrence of a repeated DST hour", () => {
+    // 2026-11-01 falls back at 02:00 America/New_York: 06:30Z is 01:30 EST.
+    expect(
+      getHourInTimeZone(new Date("2026-11-01T06:30:00Z"), "America/New_York")
+    ).toBe(1)
   })
 })
 

@@ -48,6 +48,32 @@ export function toCivilDate(instant: Date, timeZone: string): Date {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
+const hourFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function getHourFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = hourFormatters.get(timeZone)
+  if (!formatter) {
+    // `h23` (not `hour12: false`) because ICU can emit "24" for midnight.
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour: "numeric",
+      hourCycle: "h23",
+    })
+    hourFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
+/** Hour of day (0-23) the instant falls on in the given IANA timezone. */
+export function getHourInTimeZone(instant: Date, timeZone: string): number {
+  const value = getHourFormatter(timeZone)
+    .formatToParts(instant)
+    .find((part) => part.type === "hour")?.value
+  if (!value) return 0
+  const hour = parseInt(value, 10)
+  return Number.isNaN(hour) ? 0 : hour
+}
+
 /**
  * Adds whole civil days to a civil date. Safe because the input is always at
  * UTC midnight, so there is no DST transition on the UTC axis.

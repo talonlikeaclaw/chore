@@ -117,6 +117,9 @@ export async function updateHouseholdPreferences(input: {
   hourCycle: string
   dateFormat: string
   defaultIntervalDays: number
+  digestEnabled: boolean
+  digestDay: number
+  digestHour: number
 }): Promise<void> {
   const householdId = await getUserHouseholdId()
   const preferences = normalizeHouseholdPreferences(input)
@@ -124,6 +127,22 @@ export async function updateHouseholdPreferences(input: {
   globalThis.socketio?.to(`household:${householdId}`).emit("household:updated")
   revalidatePath("/dashboard")
   revalidatePath("/history")
+  revalidatePath("/household")
+}
+
+export async function updateDigestOptIn(enabled: boolean): Promise<void> {
+  const membership = await getUserMembership()
+  if (typeof enabled !== "boolean") throw new Error("Choose a digest setting")
+  await db
+    .update(householdMembers)
+    .set({ notifyDigest: enabled })
+    .where(
+      and(
+        eq(householdMembers.householdId, membership.householdId),
+        eq(householdMembers.userId, membership.userId)
+      )
+    )
+  globalThis.socketio?.to(`household:${membership.householdId}`).emit("household:updated")
   revalidatePath("/household")
 }
 

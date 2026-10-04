@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("next/navigation", () => ({
@@ -15,12 +15,14 @@ vi.mock("@/lib/actions", () => ({
   updateHouseholdName: vi.fn(),
   updateHouseholdTimezone: vi.fn(),
   updateHouseholdPreferences: vi.fn(),
+  updateDigestOptIn: vi.fn(),
   removeMember: vi.fn(),
   transferOwnership: vi.fn(),
   regenerateInviteCode: vi.fn(),
 }))
 
 import { HouseholdSettings } from "@/app/household/household-settings"
+import { updateDigestOptIn, updateHouseholdPreferences } from "@/lib/actions"
 
 const members = [
   {
@@ -46,11 +48,21 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
-        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
         isOwner
+        mailConfigured
+        notifyDigest
       />
     )
 
@@ -66,11 +78,21 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
-        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
         isOwner
+        mailConfigured
+        notifyDigest
       />
     )
 
@@ -84,11 +106,21 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
-        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
         inviteCode="invite-1"
         members={members}
         currentUserId="member-1"
         isOwner={false}
+        mailConfigured
+        notifyDigest
       />
     )
 
@@ -104,11 +136,21 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
-        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
         isOwner
+        mailConfigured
+        notifyDigest
       />
     )
 
@@ -131,11 +173,21 @@ describe("HouseholdSettings", () => {
         name="Home"
         timeZone="UTC"
         timeZoneOptions={[]}
-        preferences={{ weekStartsOn: 1, hourCycle: "h23", dateFormat: "mdy", defaultIntervalDays: 7 }}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
         inviteCode="invite-1"
         members={members}
         currentUserId="owner-1"
         isOwner
+        mailConfigured
+        notifyDigest
       />
     )
 
@@ -145,5 +197,214 @@ describe("HouseholdSettings", () => {
     fireEvent.change(screen.getByLabelText("Week starts on"), { target: { value: "0" } })
 
     expect(saves.some((button) => !button.disabled)).toBe(true)
+  })
+
+  it("keeps the digest day and hour disabled until the digest is on", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: false,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    expect(
+      screen.getByRole("checkbox", { name: "Send a weekly chore digest to members" })
+    ).toBeTruthy()
+    expect((screen.getByLabelText("Send on") as HTMLSelectElement).disabled).toBe(true)
+    expect((screen.getByLabelText("Send at") as HTMLSelectElement).disabled).toBe(true)
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Email me the weekly digest" })
+        .getAttribute("aria-disabled")
+    ).toBe("true")
+    expect(screen.getByText("Weekly digest is off for this household.")).toBeTruthy()
+  })
+
+  it("enables the digest day and hour once the digest is on", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 3,
+          digestHour: 20,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    const day = screen.getByLabelText("Send on") as HTMLSelectElement
+    const hour = screen.getByLabelText("Send at") as HTMLSelectElement
+    expect(day.disabled).toBe(false)
+    expect(hour.disabled).toBe(false)
+    expect(day.value).toBe("3")
+    expect(hour.value).toBe("20")
+    expect(hour.options).toHaveLength(24)
+  })
+
+  it("disables the digest controls and explains why when mail is unconfigured", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured={false}
+        notifyDigest
+      />
+    )
+
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Send a weekly chore digest to members" })
+        .getAttribute("aria-disabled")
+    ).toBe("true")
+    expect((screen.getByLabelText("Send on") as HTMLSelectElement).disabled).toBe(true)
+    expect(
+      screen.getByText("Set SMTP_HOST and MAIL_FROM on the server to enable email.")
+    ).toBeTruthy()
+  })
+
+  it("toggles the personal digest opt-in immediately", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Email me the weekly digest" }))
+
+    expect(updateDigestOptIn).toHaveBeenCalledWith(false)
+  })
+
+  it("saves the household digest switch immediately", async () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Send a weekly chore digest to members" })
+    )
+
+    await waitFor(() =>
+      expect(updateHouseholdPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ digestEnabled: false, digestDay: 1, digestHour: 8 })
+      )
+    )
+  })
+
+  it("saves the digest day immediately without arming the Preferences save", async () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText("Send on"), { target: { value: "3" } })
+
+    await waitFor(() =>
+      expect(updateHouseholdPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ digestEnabled: true, digestDay: 3, digestHour: 8 })
+      )
+    )
+
+    const saves = await waitFor(() => {
+      const buttons = screen.getAllByRole("button", { name: "Save" }) as HTMLButtonElement[]
+      expect(buttons).toHaveLength(2)
+      return buttons
+    })
+    expect(saves.every((button) => button.disabled)).toBe(true)
   })
 })

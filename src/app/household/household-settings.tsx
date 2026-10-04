@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Check, Pencil, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { TimeZoneCombobox } from "@/components/timezone-combobox"
@@ -14,6 +15,7 @@ import {
   regenerateInviteCode,
   removeMember,
   transferOwnership,
+  updateDigestOptIn,
   updateHouseholdName,
   updateHouseholdPreferences,
   updateHouseholdTimezone,
@@ -47,6 +49,8 @@ type HouseholdSettingsProps = {
   members: MemberRow[]
   currentUserId: string
   isOwner: boolean
+  mailConfigured: boolean
+  notifyDigest: boolean
 }
 
 export function HouseholdSettings({
@@ -58,6 +62,8 @@ export function HouseholdSettings({
   members,
   currentUserId,
   isOwner,
+  mailConfigured,
+  notifyDigest: initialNotifyDigest,
 }: HouseholdSettingsProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -70,6 +76,10 @@ export function HouseholdSettings({
   const [defaultIntervalDays, setDefaultIntervalDays] = useState(
     String(preferences.defaultIntervalDays)
   )
+  const [digestEnabled, setDigestEnabled] = useState(preferences.digestEnabled)
+  const [digestDay, setDigestDay] = useState(preferences.digestDay)
+  const [digestHour, setDigestHour] = useState(preferences.digestHour)
+  const [notifyDigest, setNotifyDigest] = useState(initialNotifyDigest)
   const [confirmAction, setConfirmAction] = useState<"leave" | "delete" | null>(
     null
   )
@@ -125,10 +135,58 @@ export function HouseholdSettings({
           hourCycle,
           dateFormat,
           defaultIntervalDays: parseInt(defaultIntervalDays, 10),
+          digestEnabled,
+          digestDay,
+          digestHour,
         })
         toast.success("Preferences updated")
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not update preferences")
+      }
+    })
+  }
+
+  const handleDigestChange = (next: {
+    digestEnabled: boolean
+    digestDay: number
+    digestHour: number
+  }) => {
+    const previous = { digestEnabled, digestDay, digestHour }
+    setDigestEnabled(next.digestEnabled)
+    setDigestDay(next.digestDay)
+    setDigestHour(next.digestHour)
+    startTransition(async () => {
+      try {
+        // Display preferences go along unchanged so a digest edit cannot
+        // clobber unsaved edits sitting in the Preferences section.
+        await updateHouseholdPreferences({
+          weekStartsOn: preferences.weekStartsOn,
+          hourCycle: preferences.hourCycle,
+          dateFormat: preferences.dateFormat,
+          defaultIntervalDays: preferences.defaultIntervalDays,
+          ...next,
+        })
+        toast.success("Digest settings updated")
+      } catch (error) {
+        setDigestEnabled(previous.digestEnabled)
+        setDigestDay(previous.digestDay)
+        setDigestHour(previous.digestHour)
+        toast.error(
+          error instanceof Error ? error.message : "Could not update digest settings"
+        )
+      }
+    })
+  }
+
+  const handleToggleOptIn = (enabled: boolean) => {
+    setNotifyDigest(enabled)
+    startTransition(async () => {
+      try {
+        await updateDigestOptIn(enabled)
+        toast.success(enabled ? "Digest emails on" : "Digest emails off")
+      } catch {
+        setNotifyDigest(!enabled)
+        toast.error("Could not update email setting")
       }
     })
   }
@@ -476,6 +534,7 @@ export function HouseholdSettings({
         <p className="text-xs text-muted-foreground">
           Prefills the interval when adding a chore.
         </p>
+
         <Button
           className="self-start"
           onClick={handleSavePreferences}
@@ -483,6 +542,83 @@ export function HouseholdSettings({
         >
           {isPending ? "Saving…" : "Save"}
         </Button>
+      </div>
+
+      <Separator />
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">Email notifications</h2>
+
+        <label className="flex items-center gap-2 text-sm" htmlFor="household-digest-enabled">
+          <Checkbox
+            id="household-digest-enabled"
+            checked={digestEnabled}
+            onCheckedChange={(checked) =>
+              handleDigestChange({ digestEnabled: checked, digestDay, digestHour })
+            }
+            disabled={isPending || !mailConfigured}
+          />
+          Send a weekly chore digest to members
+        </label>
+
+        <label className="text-sm" htmlFor="household-digest-day">Send on</label>
+        <select
+          id="household-digest-day"
+          className={selectClassName}
+          value={String(digestDay)}
+          onChange={(e) =>
+            handleDigestChange({
+              digestEnabled,
+              digestDay: parseInt(e.target.value, 10),
+              digestHour,
+            })
+          }
+          disabled={isPending || !digestEnabled || !mailConfigured}
+        >
+          {WEEKDAY_NAMES.map((weekday, index) => (
+            <option key={weekday} value={String(index)}>{weekday}</option>
+          ))}
+        </select>
+
+        <label className="text-sm" htmlFor="household-digest-hour">Send at</label>
+        <select
+          id="household-digest-hour"
+          className={selectClassName}
+          value={String(digestHour)}
+          onChange={(e) =>
+            handleDigestChange({
+              digestEnabled,
+              digestDay,
+              digestHour: parseInt(e.target.value, 10),
+            })
+          }
+          disabled={isPending || !digestEnabled || !mailConfigured}
+        >
+          {Array.from({ length: 24 }, (_, hour) => (
+            <option key={hour} value={String(hour)}>{String(hour).padStart(2, "0")}:00</option>
+          ))}
+        </select>
+
+        <p className="text-xs text-muted-foreground">
+          {mailConfigured
+            ? "Times are in the household timezone. The digest is skipped when nothing is due."
+            : "Set SMTP_HOST and MAIL_FROM on the server to enable email."}
+        </p>
+
+        <label className="flex items-center gap-2 text-sm" htmlFor="household-digest-opt-in">
+          <Checkbox
+            id="household-digest-opt-in"
+            checked={notifyDigest}
+            onCheckedChange={(checked) => handleToggleOptIn(checked)}
+            disabled={isPending || !digestEnabled}
+          />
+          Email me the weekly digest
+        </label>
+        {mailConfigured && !digestEnabled && (
+          <p className="text-xs text-muted-foreground">
+            Weekly digest is off for this household.
+          </p>
+        )}
       </div>
 
       <Separator />

@@ -6,6 +6,9 @@ const valid = {
   hourCycle: "h23",
   dateFormat: "mdy",
   defaultIntervalDays: 7,
+  digestEnabled: true,
+  digestDay: 1,
+  digestHour: 8,
 }
 
 describe("normalizeHouseholdPreferences", () => {
@@ -20,12 +23,18 @@ describe("normalizeHouseholdPreferences", () => {
         hourCycle: "h12",
         dateFormat: "dmy",
         defaultIntervalDays: 1000,
+        digestEnabled: false,
+        digestDay: 6,
+        digestHour: 23,
       })
     ).toEqual({
       weekStartsOn: 0,
       hourCycle: "h12",
       dateFormat: "dmy",
       defaultIntervalDays: 1000,
+      digestEnabled: false,
+      digestDay: 6,
+      digestHour: 23,
     })
   })
 
@@ -51,5 +60,32 @@ describe("normalizeHouseholdPreferences", () => {
     expect(() =>
       normalizeHouseholdPreferences({ ...valid, defaultIntervalDays: 0 })
     ).toThrow("Enter a default interval between 1 and 1000 days")
+  })
+
+  it("rejects a digest day outside 0–6", () => {
+    expect(() => normalizeHouseholdPreferences({ ...valid, digestDay: 7 })).toThrow(
+      "Choose a digest day"
+    )
+  })
+
+  it("rejects a digest hour outside 0–23", () => {
+    expect(() => normalizeHouseholdPreferences({ ...valid, digestHour: 24 })).toThrow(
+      "Choose a digest time"
+    )
+  })
+
+  it("rejects a fractional digest hour", () => {
+    expect(() => normalizeHouseholdPreferences({ ...valid, digestHour: 1.5 })).toThrow(
+      "Choose a digest time"
+    )
+  })
+
+  it("rejects a non-boolean digest flag", () => {
+    expect(() =>
+      normalizeHouseholdPreferences({
+        ...valid,
+        digestEnabled: "yes" as unknown as boolean,
+      })
+    ).toThrow("Choose digest settings")
   })
 })

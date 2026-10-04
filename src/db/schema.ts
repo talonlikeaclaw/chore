@@ -84,6 +84,10 @@ export const households = pgTable("household", {
   hourCycle: text("hour_cycle", { enum: ["h12", "h23"] }).notNull().default("h23"),
   dateFormat: text("date_format", { enum: ["mdy", "dmy"] }).notNull().default("mdy"),
   defaultIntervalDays: integer("default_interval_days").notNull().default(7),
+  digestEnabled: boolean("digest_enabled").notNull().default(false),
+  digestDay: integer("digest_day").notNull().default(1),
+  digestHour: integer("digest_hour").notNull().default(8),
+  digestLastSentOn: text("digest_last_sent_on"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -101,6 +105,7 @@ export const householdMembers = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role", { enum: ["owner", "member"] }).notNull().default("member"),
+    notifyDigest: boolean("notify_digest").notNull().default(true),
     joinedAt: timestamp("joined_at").defaultNow().notNull(),
   },
   (table) => [
