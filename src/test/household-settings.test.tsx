@@ -16,13 +16,15 @@ vi.mock("@/lib/actions", () => ({
   updateHouseholdTimezone: vi.fn(),
   updateHouseholdPreferences: vi.fn(),
   updateDigestOptIn: vi.fn(),
+  sendTestDigest: vi.fn(),
   removeMember: vi.fn(),
   transferOwnership: vi.fn(),
   regenerateInviteCode: vi.fn(),
 }))
 
 import { HouseholdSettings } from "@/app/household/household-settings"
-import { updateDigestOptIn, updateHouseholdPreferences } from "@/lib/actions"
+import { sendTestDigest, updateDigestOptIn, updateHouseholdPreferences } from "@/lib/actions"
+import { toast } from "sonner"
 
 const members = [
   {
@@ -39,7 +41,10 @@ const members = [
   },
 ]
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
 
 describe("HouseholdSettings", () => {
   it("lists members with names and role badges", () => {
@@ -406,5 +411,95 @@ describe("HouseholdSettings", () => {
       return buttons
     })
     expect(saves.every((button) => button.disabled)).toBe(true)
+  })
+
+  it("sends a test email even while the weekly digest is off", async () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: false,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Send test email" }))
+
+    await waitFor(() => expect(sendTestDigest).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Test email sent"))
+  })
+
+  it("disables the test email when mail is unconfigured", () => {
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured={false}
+        notifyDigest
+      />
+    )
+
+    expect(screen.getByRole("button", { name: "Send test email" })).toBeDisabled()
+  })
+
+  it("surfaces the SMTP error when the test email fails", async () => {
+    vi.mocked(sendTestDigest).mockRejectedValueOnce(new Error("SMTP is not configured"))
+
+    render(
+      <HouseholdSettings
+        name="Home"
+        timeZone="UTC"
+        timeZoneOptions={[]}
+        preferences={{
+          weekStartsOn: 1,
+          hourCycle: "h23",
+          dateFormat: "mdy",
+          defaultIntervalDays: 7,
+          digestEnabled: true,
+          digestDay: 1,
+          digestHour: 8,
+        }}
+        inviteCode="invite-1"
+        members={members}
+        currentUserId="owner-1"
+        isOwner
+        mailConfigured
+        notifyDigest
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Send test email" }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("SMTP is not configured")
+    )
   })
 })

@@ -62,6 +62,10 @@ assumes one app replica. A per-household civil date stops double sends, an empty
 window or a full opt-out sends nothing, and each recipient gets their own message.
 Watch for `[digest] checked N households, sent M emails to K recipients`.
 
+**Send test email** in the same section mails the digest to your own address
+right away, whatever the schedule and switches say, with a `[Test]` subject. It
+writes nothing, so it never consumes or delays the weekly slot.
+
 ## Production (first deploy)
 
 1. Create the persistent volume:

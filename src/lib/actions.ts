@@ -6,9 +6,10 @@ import { revalidatePath } from "next/cache"
 
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
-import { chores, completions, households, householdMembers, rooms } from "@/db/schema"
+import { chores, completions, households, householdMembers, rooms, user } from "@/db/schema"
 import { isValidTimeZone } from "@/lib/timezone"
 import type { ChoreRecurrence } from "@/lib/chores"
+import { sendTestDigestEmail } from "@/lib/digest-runner"
 import { normalizeHouseholdPreferences } from "@/lib/preferences"
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -144,6 +145,16 @@ export async function updateDigestOptIn(enabled: boolean): Promise<void> {
     )
   globalThis.socketio?.to(`household:${membership.householdId}`).emit("household:updated")
   revalidatePath("/household")
+}
+
+export async function sendTestDigest(): Promise<void> {
+  const membership = await getUserMembership()
+  const [account] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, membership.userId))
+  if (!account) throw new Error("Unauthorized")
+  await sendTestDigestEmail({ householdId: membership.householdId, to: account.email })
 }
 
 export async function updateHouseholdName(name: string): Promise<void> {

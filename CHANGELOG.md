@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While the version is below `1.0.0`, a minor release may include behavior changes;
 those are called out under **Changed**.
 
+## [0.8.1] - 2026-10-04
+
+### Added
+
+- `/household`'s `Email notifications` section has a `Send test email` button:
+  it mails the household's digest to your own address on demand, so SMTP can be
+  checked without waiting for the weekly slot. The subject is marked `[Test]`,
+  and the send writes nothing — the schedule and `digest_last_sent_on` are left
+  alone, and it works while the household digest is off.
+
 ## [0.8.0] - 2026-10-04
 
 ### Added
@@ -236,6 +246,7 @@ invite-code joins, Socket.io real-time updates, drag-and-drop room ordering,
 better-auth email/password sign-in, and mobile touch targets. Schema at
 migration `0003_same_hedge_knight.sql`.
 
+[0.8.1]: https://github.com/talonlikeaclaw/chore/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/talonlikeaclaw/chore/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/talonlikeaclaw/chore/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/talonlikeaclaw/chore/compare/v0.7.1...v0.7.2

@@ -8,9 +8,11 @@ import {
   buildDigest,
   isDigestDue,
   type DigestChore,
+  type DigestEmail,
 } from "@/lib/digest"
 import { isMailConfigured } from "@/lib/mail-config"
 import { sendMail } from "@/lib/mailer"
+import type { DateFormat } from "@/lib/preferences"
 import { isValidTimeZone } from "@/lib/timezone"
 
 export type DigestRunResult = {
@@ -18,6 +20,90 @@ export type DigestRunResult = {
   sent: number
   recipients: number
   failed: number
+}
+
+/** Everything the digest copy needs from a household. */
+type DigestHousehold = {
+  id: string
+  name: string
+  timezone: string
+  dateFormat: DateFormat
+}
+
+const digestHouseholdColumns = {
+  id: households.id,
+  name: households.name,
+  timezone: households.timezone,
+  dateFormat: households.dateFormat,
+}
+
+/**
+ * Active chores inside the digest window, grouped by room in room order and
+ * sorted by due date within each room.
+ */
+async function collectDigestChores(
+  householdId: string,
+  timeZone: string,
+  now: Date
+): Promise<DigestChore[]> {
+  const roomList = await db.query.rooms.findMany({
+    where: eq(rooms.householdId, householdId),
+    orderBy: [asc(rooms.sortOrder)],
+    with: {
+      chores: {
+        where: eq(chores.active, true),
+        with: {
+          completions: {
+            orderBy: [desc(completions.completedAt)],
+            limit: 1,
+            with: { user: { columns: { name: true } } },
+          },
+        },
+      },
+    },
+  })
+
+  const digestChores: DigestChore[] = []
+  for (const room of roomList) {
+    const roomChores: DigestChore[] = []
+    for (const chore of room.chores) {
+      const lastCompletion = chore.completions[0] ?? null
+      const dueDate = getDueDate(chore, lastCompletion, timeZone)
+      const daysUntilDue = getDaysUntilDue(dueDate, now, timeZone)
+      if (daysUntilDue > DIGEST_WINDOW_DAYS) continue
+      roomChores.push({
+        name: chore.name,
+        roomName: room.name,
+        dueDate,
+        daysUntilDue,
+        cadence: describeRecurrence(chore),
+        lastDoneBy: lastCompletion?.user.name ?? null,
+      })
+    }
+    roomChores.sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.name.localeCompare(b.name))
+    digestChores.push(...roomChores)
+  }
+
+  return digestChores
+}
+
+function buildHouseholdDigest(
+  household: DigestHousehold,
+  chores: DigestChore[],
+  now: Date
+): DigestEmail {
+  const appUrl = (process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000").replace(
+    /\/+$/,
+    ""
+  )
+  return buildDigest({
+    householdName: household.name,
+    appUrl,
+    now,
+    timeZone: household.timezone,
+    dateFormat: household.dateFormat,
+    chores,
+  })
 }
 
 /**
@@ -29,17 +115,9 @@ export async function runDueDigests(now: Date = new Date()): Promise<DigestRunRe
   const result: DigestRunResult = { households: 0, sent: 0, recipients: 0, failed: 0 }
   if (!isMailConfigured()) return result
 
-  const appUrl = (process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000").replace(
-    /\/+$/,
-    ""
-  )
-
   const candidates = await db
     .select({
-      id: households.id,
-      name: households.name,
-      timezone: households.timezone,
-      dateFormat: households.dateFormat,
+      ...digestHouseholdColumns,
       digestDay: households.digestDay,
       digestHour: households.digestHour,
       digestLastSentOn: households.digestLastSentOn,
@@ -76,45 +154,11 @@ export async function runDueDigests(now: Date = new Date()): Promise<DigestRunRe
           )
         )
 
-      const roomList = await db.query.rooms.findMany({
-        where: eq(rooms.householdId, household.id),
-        orderBy: [asc(rooms.sortOrder)],
-        with: {
-          chores: {
-            where: eq(chores.active, true),
-            with: {
-              completions: {
-                orderBy: [desc(completions.completedAt)],
-                limit: 1,
-                with: { user: { columns: { name: true } } },
-              },
-            },
-          },
-        },
-      })
-
-      const digestChores: DigestChore[] = []
-      for (const room of roomList) {
-        const roomChores: DigestChore[] = []
-        for (const chore of room.chores) {
-          const lastCompletion = chore.completions[0] ?? null
-          const dueDate = getDueDate(chore, lastCompletion, household.timezone)
-          const daysUntilDue = getDaysUntilDue(dueDate, now, household.timezone)
-          if (daysUntilDue > DIGEST_WINDOW_DAYS) continue
-          roomChores.push({
-            name: chore.name,
-            roomName: room.name,
-            dueDate,
-            daysUntilDue,
-            cadence: describeRecurrence(chore),
-            lastDoneBy: lastCompletion?.user.name ?? null,
-          })
-        }
-        roomChores.sort(
-          (a, b) => a.daysUntilDue - b.daysUntilDue || a.name.localeCompare(b.name)
-        )
-        digestChores.push(...roomChores)
-      }
+      const digestChores = await collectDigestChores(
+        household.id,
+        household.timezone,
+        now
+      )
 
       // Nothing to report (or nobody to tell) still consumes the slot, so the
       // household does not get a stale digest on the next tick.
@@ -123,14 +167,7 @@ export async function runDueDigests(now: Date = new Date()): Promise<DigestRunRe
         continue
       }
 
-      const email = buildDigest({
-        householdName: household.name,
-        appUrl,
-        now,
-        timeZone: household.timezone,
-        dateFormat: household.dateFormat,
-        chores: digestChores,
-      })
+      const email = buildHouseholdDigest(household, digestChores, now)
 
       let sentForHousehold = 0
       for (const recipient of recipients) {
@@ -162,4 +199,36 @@ async function markSlotConsumed(householdId: string, scheduledOn: string): Promi
     .update(households)
     .set({ digestLastSentOn: scheduledOn })
     .where(eq(households.id, householdId))
+}
+
+/**
+ * Mails the household's digest to one address right now, whatever the schedule
+ * says, so members can check their SMTP setup without waiting for a slot. The
+ * subject is marked so it cannot be mistaken for the weekly mail, and this
+ * deliberately writes nothing — the real slot stays where it is.
+ */
+export async function sendTestDigestEmail(input: {
+  householdId: string
+  to: string
+  now?: Date
+}): Promise<void> {
+  const now = input.now ?? new Date()
+
+  const [household] = await db
+    .select(digestHouseholdColumns)
+    .from(households)
+    .where(eq(households.id, input.householdId))
+
+  if (!household) throw new Error("Household not found")
+  if (!isValidTimeZone(household.timezone)) throw new Error("Invalid household timezone")
+
+  const chores = await collectDigestChores(household.id, household.timezone, now)
+  const email = buildHouseholdDigest(household, chores, now)
+
+  await sendMail({
+    to: input.to,
+    subject: `[Test] ${email.subject}`,
+    html: email.html,
+    text: email.text,
+  })
 }

@@ -14,6 +14,7 @@ import {
   leaveHousehold,
   regenerateInviteCode,
   removeMember,
+  sendTestDigest,
   transferOwnership,
   updateDigestOptIn,
   updateHouseholdName,
@@ -173,6 +174,19 @@ export function HouseholdSettings({
         setDigestHour(previous.digestHour)
         toast.error(
           error instanceof Error ? error.message : "Could not update digest settings"
+        )
+      }
+    })
+  }
+
+  const handleSendTest = () => {
+    startTransition(async () => {
+      try {
+        await sendTestDigest()
+        toast.success("Test email sent")
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not send the test email"
         )
       }
     })
@@ -619,6 +633,18 @@ export function HouseholdSettings({
             Weekly digest is off for this household.
           </p>
         )}
+
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={handleSendTest}
+          disabled={isPending || !mailConfigured}
+        >
+          Send test email
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Mails the digest to your own address now, without touching the weekly schedule.
+        </p>
       </div>
 
       <Separator />
